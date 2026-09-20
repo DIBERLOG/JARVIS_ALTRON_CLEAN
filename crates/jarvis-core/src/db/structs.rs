@@ -42,6 +42,8 @@ pub struct Settings {
     pub chat_speak_responses: bool,
     #[serde(default = "default_personality")]
     pub personality: String,
+    #[serde(default = "default_voice_dialogue_personality")]
+    pub voice_dialogue_personality: String,
 
     pub api_keys: ApiKeys,
 }
@@ -55,6 +57,7 @@ fn default_local_chat_model() -> String { "qwen3:8b".to_string() }
 fn default_deepseek_chat_model() -> String { "deepseek-flash".to_string() }
 fn default_chat_speak_responses() -> bool { true }
 fn default_personality() -> String { "jarvis".to_string() }
+fn default_voice_dialogue_personality() -> String { "jarvis".to_string() }
 
 // ### KEY-VALUE ACCESS
 
@@ -79,6 +82,7 @@ impl Settings {
             "deepseek_chat_model"       => Some(self.deepseek_chat_model.clone()),
             "chat_speak_responses"      => Some(self.chat_speak_responses.to_string()),
             "assistant_personality"      => Some(self.personality.clone()),
+            "voice_dialogue_personality" => Some(self.voice_dialogue_personality.clone()),
             "api_key__picovoice"        => Some(self.api_keys.picovoice.clone()),
             "api_key__openai"           => Some(self.api_keys.openai.clone()),
             "api_key__deepseek"         => Some(self.api_keys.deepseek.clone()),
@@ -144,6 +148,7 @@ impl Settings {
             "deepseek_chat_model" => self.deepseek_chat_model = val.to_string(),
             "chat_speak_responses" => self.chat_speak_responses = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
             "assistant_personality" => { if val != "jarvis" && val != "altron" { return Err("personality must be jarvis or altron".into()) }; self.personality = val.to_string(); }
+            "voice_dialogue_personality" => { if val != "jarvis" && val != "altron" { return Err("voice dialogue personality must be jarvis or altron".into()) }; self.voice_dialogue_personality = val.to_string(); }
             "api_key__picovoice" => {
                 self.api_keys.picovoice = val.to_string();
             }
@@ -176,6 +181,7 @@ impl Settings {
             "deepseek_chat_model",
             "chat_speak_responses",
             "assistant_personality",
+            "voice_dialogue_personality",
             "api_key__picovoice",
             "api_key__openai",
             "api_key__deepseek",
@@ -211,6 +217,7 @@ impl Default for Settings {
             deepseek_chat_model: default_deepseek_chat_model(),
             chat_speak_responses: default_chat_speak_responses(),
             personality: default_personality(),
+            voice_dialogue_personality: default_voice_dialogue_personality(),
 
             api_keys: ApiKeys {
                 picovoice: String::from(""),

@@ -44,7 +44,6 @@ pub mod ipc;
 pub mod voices;
 pub mod tts;
 
-#[cfg(feature = "lua")]
 pub mod chat;
 
 pub mod audio_buffer;

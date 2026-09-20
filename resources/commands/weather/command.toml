@@ -1,6 +1,7 @@
 [[commands]]
 id = "weather"
 type = "lua"
+description = "Показать температуру в градусах Цельсия"
 script = "script.lua"
 timeout = 5000
 sandbox = "standard"
@@ -21,6 +22,7 @@ context = ["in", "for", "at", "в", "для"]
 [[commands]]
 id = "set_city"
 type = "lua"
+description = "Сохранить город для команды погоды"
 script = "set_city.lua"
 sandbox = "standard"
 timeout = 5000

@@ -1,6 +1,7 @@
 [[commands]]
 id = "calculator_open"
 type = "cli"
+description = "Открыть калькулятор Windows"
 cli_cmd = "calc"
 sounds.ru = ["ok1", "ok2", "ok3"]
 phrases.ru = ["включи калькулятор", "открой калькулятор", "покажи калькулятор", "запусти калькулятор", "калькулятор"]
@@ -8,6 +9,7 @@ phrases.ru = ["включи калькулятор", "открой кальку�
 [[commands]]
 id = "calculator_close"
 type = "cli"
+description = "Закрыть калькулятор Windows"
 cli_cmd = "taskkill"
 cli_args = ["/f", "/im", "CalculatorApp.exe"]
 sounds.ru = ["ok1", "ok2", "ok3"]

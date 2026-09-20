@@ -1,6 +1,7 @@
 [[commands]]
 id = "vscode_open"
 type = "ahk"
+description = "Открыть Visual Studio Code"
 exe_path = "ahk/Open VS Code.exe"
 sounds.ru = ["ok1", "ok2", "ok3"]
 phrases.ru = ["открой вс код", "открой vscode", "запусти вс код", "запусти vscode", "открой visual studio code"]
@@ -8,6 +9,7 @@ phrases.ru = ["открой вс код", "открой vscode", "запусти
 [[commands]]
 id = "vscode_close"
 type = "ahk"
+description = "Закрыть Visual Studio Code"
 exe_path = "ahk/Close VS Code.exe"
 sounds.ru = ["ok1", "ok2", "ok3"]
 phrases.ru = ["закрой вс код", "закрой vscode", "выключи вс код", "закрой visual studio code"]

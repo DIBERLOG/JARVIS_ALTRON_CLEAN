@@ -1,6 +1,7 @@
 [[commands]]
 id = "game_mode"
 type = "ahk"
+description = "Включить игровой режим и открыть Steam"
 exe_path = "ahk/Open steam.exe"
 sounds.ru = ["reply1", "reply2", "reply3"]
 phrases.ru = ["джарвис игровой режим", "включи игровой режим", "перейди в игровой режим", "я хочу поиграть", "включи стим", "запусти стим", "открой стим"]
@@ -8,6 +9,7 @@ phrases.ru = ["джарвис игровой режим", "включи игро
 [[commands]]
 id = "steam_close"
 type = "ahk"
+description = "Закрыть Steam и вернуться в рабочий режим"
 exe_path = "ahk/Close steam.exe"
 sounds.ru = ["ok1", "ok2", "ok3"]
 phrases.ru = ["рабочий режим", "выключи игровой режим", "выключи стим", "закрой стим"]

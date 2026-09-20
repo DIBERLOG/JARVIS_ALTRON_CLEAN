@@ -1,0 +1,13 @@
+[[commands]]
+id = "dialogue_start"
+type = "voice"
+description = "Включить голосовой диалог с выбранной личностью"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["давай пообщаемся", "давай поговорим", "включи диалоговый режим"]
+
+[[commands]]
+id = "dialogue_stop"
+type = "voice"
+description = "Закончить голосовой диалог"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["закончи разговор", "закончим разговор", "хватит общаться", "выключи диалоговый режим"]

@@ -82,6 +82,7 @@
     let selectedNoiseSuppression = ""
     let selectedVad = ""
     let gainNormalizerEnabled = false
+    let voiceDialoguePersonality = "jarvis"
     let apiKeyPicovoice = ""
     let apiKeyOpenai = ""
 
@@ -107,14 +108,15 @@
                 invoke("db_write", { key: "assistant_voice", val: voiceVal }),
                 invoke("db_write", { key: "selected_microphone", val: selectedMicrophone }),
                 invoke("db_write", { key: "selected_wake_word_engine", val: selectedWakeWordEngine }),
-                invoke("db_write", { key: "selected_intent_recognition_engine", val: selectedIntentRecognitionEngine }),
-                invoke("db_write", { key: "selected_slot_extraction_engine", val: selectedSlotExtractionEngine }),
+                invoke("db_write", { key: "intent_backend", val: selectedIntentRecognitionEngine }),
+                invoke("db_write", { key: "slots_backend", val: selectedSlotExtractionEngine }),
                 invoke("db_write", { key: "selected_gliner_model", val: selectedGlinerModel }),
                 invoke("db_write", { key: "selected_vosk_model", val: selectedVoskModel }),
 
                 invoke("db_write", { key: "noise_suppression", val: selectedNoiseSuppression }),
-                invoke("db_write", { key: "vad", val: selectedVad }),
+                invoke("db_write", { key: "vad_backend", val: selectedVad }),
                 invoke("db_write", { key: "gain_normalizer", val: gainNormalizerEnabled.toString() }),
+                invoke("db_write", { key: "voice_dialogue_personality", val: voiceDialoguePersonality }),
 
                 invoke("db_write", { key: "api_key__picovoice", val: apiKeyPicovoice }),
                 invoke("db_write", { key: "api_key__openai", val: apiKeyOpenai })
@@ -187,18 +189,19 @@
 
             // load settings from db
             const [mic, wakeWord, intentReco, slotEngine, glinerModel, voskModel,
-                   noiseSuppression, vad, gainNormalizer,
+                   noiseSuppression, vad, gainNormalizer, dialoguePersonality,
                    pico, openai] = await Promise.all([
                 invoke<string>("db_read", { key: "selected_microphone" }),
                 invoke<string>("db_read", { key: "selected_wake_word_engine" }),
-                invoke<string>("db_read", { key: "selected_intent_recognition_engine" }),
-                invoke<string>("db_read", { key: "selected_slot_extraction_engine" }),
+                invoke<string>("db_read", { key: "intent_backend" }),
+                invoke<string>("db_read", { key: "slots_backend" }),
                 invoke<string>("db_read", { key: "selected_gliner_model" }),
                 invoke<string>("db_read", { key: "selected_vosk_model" }),
 
                 invoke<string>("db_read", { key: "noise_suppression" }),
-                invoke<string>("db_read", { key: "vad" }),
+                invoke<string>("db_read", { key: "vad_backend" }),
                 invoke<string>("db_read", { key: "gain_normalizer" }),
+                invoke<string>("db_read", { key: "voice_dialogue_personality" }),
 
                 invoke<string>("db_read", { key: "api_key__picovoice" }),
                 invoke<string>("db_read", { key: "api_key__openai" })
@@ -213,6 +216,7 @@
             selectedNoiseSuppression = noiseSuppression
             selectedVad = vad
             gainNormalizerEnabled = gainNormalizer === "true"
+            voiceDialoguePersonality = dialoguePersonality === "altron" ? "altron" : "jarvis"
             apiKeyPicovoice = pico
             apiKeyOpenai = openai
         } catch (err) {
@@ -258,6 +262,20 @@
 <Tabs class="form" color="#8AC832" position="left">
     <Tabs.Tab label={t('settings-general')} icon={Gear}>
         <Space h="sm" />
+        <section class="dialogue-personality" class:altron={voiceDialoguePersonality === "altron"} aria-labelledby="dialogue-personality-title">
+            <p class="module-label">ГОЛОСОВОЙ ДИАЛОГ</p>
+            <h3 id="dialogue-personality-title">Характер ответов</h3>
+            <p>Используется только после команды «Джарвис, давай пообщаемся». Текстовый чат настраивается отдельно.</p>
+            <div class="personality-options">
+                <button type="button" class:active={voiceDialoguePersonality === "jarvis"} on:click={() => voiceDialoguePersonality = "jarvis"}>
+                    <strong>JARVIS</strong><span>Дружелюбный оптимист-реалист: честно оценивает риски и помогает действовать.</span>
+                </button>
+                <button type="button" class:active={voiceDialoguePersonality === "altron"} on:click={() => voiceDialoguePersonality = "altron"}>
+                    <strong>ALTRON</strong><span>Презирает слабости человечества, но холодно и реалистично помогает тебе.</span>
+                </button>
+            </div>
+        </section>
+        <Space h="xl" />
         <div class="voice-select">
             <label>{t('settings-voice')}</label>
             <p class="description">{t('settings-voice-desc')}</p>
@@ -510,6 +528,31 @@
 <Footer />
 
 <style lang="scss">
+.dialogue-personality {
+    --persona-line: rgba(82, 254, 254, .38);
+    --persona-glow: rgba(82, 254, 254, .12);
+    padding: 1rem;
+    border: 1px solid var(--persona-line);
+    border-left: 3px solid #52fefe;
+    background: linear-gradient(110deg, var(--persona-glow), rgba(7, 12, 14, .36) 65%);
+
+    &.altron { --persona-line: rgba(255, 105, 82, .45); --persona-glow: rgba(145, 38, 28, .17); border-left-color: #ff6952; }
+    h3 { color: #edfafa; margin: .2rem 0; font: 700 1.1rem "Roboto Condensed", sans-serif; letter-spacing: .05em; }
+    > p:not(.module-label) { color: rgba(222, 241, 243, .65); font-size: .78rem; margin: 0 0 .85rem; }
+}
+
+.module-label { margin: 0; color: #52fefe; font: 700 .65rem "Roboto Condensed", sans-serif; letter-spacing: .15em; }
+.altron .module-label { color: #ff917f; }
+.personality-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.personality-options button { text-align: left; padding: .75rem; background: rgba(8, 28, 31, .72); border: 1px solid rgba(126, 183, 188, .26); color: #c4d6d9; cursor: pointer; transition: border-color .18s ease, transform .18s ease, background .18s ease; }
+.personality-options button:hover { transform: translateY(-1px); border-color: rgba(82, 254, 254, .55); }
+.personality-options button.active { color: #fff; background: linear-gradient(135deg, rgba(6, 102, 110, .8), rgba(15, 38, 43, .85)); border-color: #52fefe; box-shadow: 0 0 18px rgba(82, 254, 254, .12); }
+.dialogue-personality.altron .personality-options button.active:last-child { background: linear-gradient(135deg, rgba(126, 35, 25, .85), rgba(42, 14, 17, .88)); border-color: #ff6952; box-shadow: 0 0 18px rgba(255, 92, 72, .12); }
+.personality-options strong, .personality-options span { display: block; }
+.personality-options strong { font: 700 .83rem "Roboto Condensed", sans-serif; letter-spacing: .08em; }
+.personality-options span { margin-top: .28rem; font-size: .7rem; line-height: 1.35; opacity: .75; }
+@media (max-width: 520px) { .personality-options { grid-template-columns: 1fr; } }
+
 .voice-select {
     margin-bottom: 1rem;
     

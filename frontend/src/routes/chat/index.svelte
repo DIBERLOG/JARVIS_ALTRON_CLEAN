@@ -5,7 +5,7 @@
     type Config = { provider: string, local_model: string, deepseek_model: string, deepseek_configured: boolean, speak_responses: boolean, personality: string }
     let config: Config = { provider: "local", local_model: "qwen3:8b", deepseek_model: "deepseek-flash", deepseek_configured: false, speak_responses: true, personality: "jarvis" }
     let key = "", prompt = "", loading = false, error = "", webSearch = false
-    let messages: Message[] = [{ role: "system", content: "Ты JARVIS, сдержанный русскоязычный техно-ассистент. Не начинай ответы с 'я могу помочь' и не перечисляй способности без вопроса. Отвечай уверенно, спокойно, по существу, обычно 1–4 короткими предложениями. Не используй Markdown, звёздочки или эмодзи. Не выдумывай факты; если данных нет, скажи это прямо." }]
+    let messages: Message[] = []
     $: visible = messages.filter(m => m.role !== "system")
     onMount(async () => { config = await invoke<Config>("chat_get_config") })
     async function save() {

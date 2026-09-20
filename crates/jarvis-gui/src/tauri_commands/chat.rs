@@ -71,10 +71,13 @@ pub fn chat_get_config(state: tauri::State<'_, AppState>) -> ChatConfig {
 }
 
 #[tauri::command]
-pub fn chat_send(state: tauri::State<'_, AppState>, messages: Vec<ChatMessage>) -> Result<ChatReply, String> {
-    if messages.is_empty() || messages.len() > 20 { return Err("История чата пуста или слишком длинная".into()); }
-    if messages.iter().any(|m| m.content.trim().is_empty() || m.content.len() > 12_000) { return Err("Некорректное сообщение".into()); }
+pub fn chat_send(state: tauri::State<'_, AppState>, client_messages: Vec<ChatMessage>) -> Result<ChatReply, String> {
+    if client_messages.is_empty() || client_messages.len() > 20 { return Err("История чата пуста или слишком длинная".into()); }
+    if client_messages.iter().any(|m| m.content.trim().is_empty() || m.content.len() > 12_000) { return Err("Некорректное сообщение".into()); }
     let provider = state.settings.read("chat_provider").unwrap_or_else(|| "local".into());
+    let personality = state.settings.read("assistant_personality").unwrap_or_else(|| "jarvis".into());
+    let mut messages = vec![ChatMessage { role: "system".into(), content: jarvis_core::chat::persona_prompt(&personality).into() }];
+    messages.extend(client_messages);
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90)).build().map_err(|e| e.to_string())?;
     if provider == "deepseek" {
         let key = state.settings.read("api_key__deepseek").unwrap_or_default();
