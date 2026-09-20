@@ -1,65 +1,159 @@
-# JARVIS Voice Assistant (this readme is outdated)
+# JARVIS ALTRON CLEAN
 
-![We are NOT limited by the technology of our time!](poster.jpg)
+Локальная Windows-версия голосового ассистента JARVIS с командами для компьютера, текстовым и голосовым диалогом, локальной языковой моделью и экспериментальной озвучкой Silero TTS.
 
-`Jarvis` - is a voice assistant made as an experiment using neural networks for things like **STT/TTS/Wake Word/NLU** etc.
+Это личная рабочая ветка проекта [Priler/jarvis](https://github.com/Priler/jarvis). Она сохраняет лицензию и авторство исходного проекта, но добавляет прикладные функции для ежедневного использования на Windows.
 
-The main project challenges we try to achieve is:
- - 100% offline *(no cloud)*
- - Open source *(full transparency)*
- - No data collection *(we respect your privacy)*
+## Что работает сейчас
 
-Our backend stack is 🦀 **[Rust](https://www.rust-lang.org/)** with ❤️ **[Tauri](https://tauri.app/)**.<br>
-For the frontend we use ⚡️ **[Vite](https://vitejs.dev/)** + 🛠️ **[Svelte](https://svelte.dev/)**.
+- Голосовая активация и распознавание русской речи через Vosk.
+- Выполнение голосовых команд Windows.
+- Открытие и закрытие браузера, Discord, Twitch, Visual Studio Code, Steam и калькулятора.
+- Открытие YouTube, ChatGPT, Google и учебного расписания.
+- Погода по сохранённому городу или фразе вида «какая погода в Казани».
+  - В интерфейсе показывается только температура в градусах Цельсия.
+  - Ассистент произносит значение словами: «плюс пять градусов Цельсия».
+- Команды «спасибо», «как дела», шутки, перезапуск JARVIS и другие голосовые ответы.
+- Голосовой режим разговора:
+  - «Джарвис, давай пообщаемся» — начать диалог.
+  - «Джарвис, закончи разговор» — закончить его.
+- Две личности для голосового диалога, выбираемые в настройках:
+  - **JARVIS** — дружелюбный оптимист-реалист. Честно говорит о рисках и предлагает практичные действия.
+  - **ALTRON** — холодный реалист. Презирает человеческую иррациональность, но помогает собеседнику принимать разумные решения.
+- Текстовый чат в приложении:
+  - локально через Ollama (`qwen3:8b` по умолчанию);
+  - через DeepSeek API, если пользователь сам добавит ключ;
+  - выбор JARVIS или ALTRON для текстового чата;
+  - опциональный WEB INTEL: поиск перед ответом через DuckDuckGo.
+- Озвучивание ответов через Silero TTS с маршрутизацией в VB-CABLE / Voicemod.
+- Скрипт автозапуска: сначала Voicemod, затем движок JARVIS и интерфейс.
 
-*Other libraries, tools and packages can be found in source code.*
+## Быстрый запуск
 
-## Neural Networks
+Рабочая папка на текущем компьютере:
 
-This are the neural networks we are currently using:
+```powershell
+cd C:\Users\angel\Documents\ChatGPT\Jarvis_X_Altron_clean_staging
+.\target\debug\jarvis-app.exe
+.\target\debug\jarvis-gui.exe
+```
 
- - Speech-To-Text
-	 - [Vosk Speech Recognition Toolkit](https://github.com/alphacep/vosk-api) via [Vosk-rs](https://github.com/Bear-03/vosk-rs)
- - Text-To-Speech
-	 - [~~Silero TTS~~](https://github.com/snakers4/silero-models) *(currently not used)*
-	 - [~~Coqui TTS~~](https://github.com/coqui-ai/TTS) *(currently not used)*
-	 - [~~WinRT~~](https://github.com/ndarilek/tts-rs) *(currently not used)*
-	 - [~gTTS~](https://github.com/nightlyistaken/tts_rust) *(currently not used)*
-	 - [~~SAM~~](https://github.com/s-macke/SAM) *(currently not used)*
- - Wake Word
-	 - [Rustpotter](https://github.com/GiviMAD/rustpotter) *(Partially implemented, still WIP)*
-	 - [Picovoice Porcupine](https://github.com/Picovoice/porcupine) via [official SDK](https://github.com/Picovoice/porcupine#rust) *(requires API key)*
-	 - [Vosk Speech Recognition Toolkit](https://github.com/alphacep/vosk-api) via [Vosk-rs](https://github.com/Bear-03/vosk-rs) *(very slow)*
-	 - [~~Snowboy~~](https://github.com/Kitt-AI/snowboy) *(currently not used)*
- - NLU
-	 - Nothing yet.
-- Chat
-	- [~~ChatGPT~~](https://chat.openai.com/) (coming soon)
+Или используй скрипт автозапуска:
 
-## Supported Languages
+```powershell
+.\tools\start-jarvis-voicemod.ps1
+```
 
-Currently, only Russian language is supported.<br>
-But soon, Ukranian and English will be added for the interface, wake-word detection and speech recognition.
+Он ожидает Voicemod по пути `C:\Program Files\Voicemod V3\Voicemod.exe`, ждёт 10 секунд и затем запускает JARVIS. В Windows для него создан ярлык автозапуска `Jarvis + Voicemod.lnk`.
 
-## How to build?
+## Настройка звука: VB-CABLE и Voicemod
 
-Nothing special was used to build this project.<br>
-You need only Rust and NodeJS installed on your system.<br>
-Other than that, all you need is to install all the dependencies and then compile the code with `cargo tauri build` command.<br>
-Or run dev with `cargo tauri dev`.
+Для голосовой обработки и озвучки используется такая цепочка:
 
-<br><br>
-*Thought you might need some of the platform specific libraries for [PvRecorder](https://github.com/Picovoice/pvrecorder) and [Vosk](https://github.com/alphacep/vosk-api).*
+```text
+Физический микрофон → Voicemod → CABLE Output → JARVIS
+JARVIS / Silero TTS → CABLE Input → Voicemod → наушники
+```
 
-## Author
+Рекомендуемые устройства:
 
-Abraham Tugalov
+- В Voicemod вход: `CABLE Output (VB-Audio Virtual Cable)`.
+- В Voicemod выход: твои наушники или колонки.
+- В Windows для приложения JARVIS выход: `CABLE Input (VB-Audio Virtual Cable)`.
+- В JARVIS в настройках выбери физический микрофон или виртуальный микрофон Voicemod — в зависимости от нужной схемы обработки.
 
-## Python version?
-Old version of Jarvis was built with Python.<br>
-The last Python version commit can be found [here](https://github.com/Priler/jarvis/tree/943efbfbdb8aeb5889fa5e2dc7348ca4ea0b81df).
+Если JARVIS перестал слышать команды после смены устройств, проверь выбранный микрофон в `Настройки → Устройства` и перезапусти `jarvis-app.exe`.
 
-## License
+## Голосовые команды
 
-[Attribution-NonCommercial-ShareAlike 4.0 International](https://creativecommons.org/licenses/by-nc-sa/4.0/)<br>
-See LICENSE.txt file for more details.
+Полный актуальный список с фразами отображается прямо в приложении: **Команды**.
+
+| Раздел | Примеры фраз |
+| --- | --- |
+| Браузер | «открой браузер», «закрой браузер», «открой гугл» |
+| Сайты | «открой ютуб», «открой чат гпт», «открой расписание» |
+| Приложения | «открой дискорд», «закрой дискорд», «открой твич», «открой вс код» |
+| Игры | «Джарвис, игровой режим», «закрой стим», «рабочий режим» |
+| Калькулятор | «открой калькулятор», «закрой калькулятор» |
+| Погода | «какая погода», «погода в Москве», «установи город Казань» |
+| Разговор | «давай пообщаемся», «закончи разговор» |
+| JARVIS | «как дела», «расскажи анекдот», «спасибо», «перезагрузи себя» |
+
+Команды находятся в [`resources/commands`](resources/commands). Каждая папка содержит `command.toml`, а Lua- и AutoHotkey-сценарии лежат рядом с ней.
+
+## Чат и личности
+
+### Голосовой диалог
+
+Выбор характера голоса находится в `Настройки → Основные → Голосовой диалог → Характер ответов`.
+
+Эта настройка отдельна от текстового чата. После выбора обязательно нажми **Сохранить**.
+
+### Текстовый чат
+
+Открой раздел **Чат** в верхней панели:
+
+- `Локально — Ollama` не требует API-ключа. По умолчанию используется `qwen3:8b`.
+- `DeepSeek API` требует личный ключ, который сохраняется локально в настройках приложения.
+- Переключатель JARVIS / ALTRON в чате влияет на системный стиль ответов модели.
+- WEB INTEL добавляет к запросу свежие сниппеты поиска. Это вспомогательная функция, поэтому важные факты нужно перепроверять по первоисточникам.
+
+## Озвучивание
+
+Приоритет движков TTS:
+
+1. **Silero TTS** — включается файлом [`resources/tts/silero-enabled.txt`](resources/tts/silero-enabled.txt).
+2. Экспериментальный Coqui-скрипт — выключен по умолчанию, так как текущая малая обучающая выборка даёт шум.
+3. Windows SAPI — запасной вариант, если Silero недоступен.
+
+Silero запускается через Python-окружение `tools/voice_training/.venv`. Первое обращение или запуск после перезагрузки может отвечать с заметной задержкой: модель загружается заново для каждой реплики.
+
+## Сборка из исходников
+
+Нужно установить Rust, Node.js / npm и зависимости Windows для Rust-проектов. Для Silero также нужны Python 3.10, PyTorch с CUDA и установленный VB-CABLE при использовании маршрутизации через Voicemod.
+
+```powershell
+cd frontend
+npm install
+npm run build
+
+cd ..
+cargo build -p jarvis-app
+cargo build -p jarvis-gui
+```
+
+После сборки ресурсы команд и TTS должны быть доступны рядом с бинарниками в `target\debug\resources`.
+
+## Экспериментальное обучение голоса
+
+В [`tools/voice_training`](tools/voice_training) находятся подготовка датасета и smoke-тест обучения.
+
+Текущие 11 коротких аудиоклипов полезны только для проверки конвейера. Для качественного собственного голоса нужно гораздо больше чистых, размеченных записей с точными транскрипциями и юридическим правом использовать этот голос.
+
+Подробности: [`tools/voice_training/README.md`](tools/voice_training/README.md).
+
+## Что осталось сделать
+
+1. **Постоянный сервис Silero TTS.** Не запускать Python и не загружать модель заново на каждую фразу — это уберёт основную задержку ответа.
+2. **Качественная собственная озвучка.** Собрать большой легальный датасет, подготовить транскрипции, обучить или дообучить модель и добавить переключатель голоса.
+3. **Надёжный веб-поиск.** Заменить парсинг сниппетов DuckDuckGo на API-провайдера с ключом пользователя, показать ссылки и источники в чате.
+4. **Контекст голосового диалога.** Сейчас каждая реплика модели самостоятельна; нужно безопасно хранить ограниченную историю разговора и кнопку её очистки.
+5. **Улучшить распознавание команд.** Добавить тесты для фраз, более надёжное извлечение города и чисел, а также подтверждение потенциально опасных действий.
+6. **Пакет установки.** Собрать переносимую или установочную Windows-версию, чтобы не запускать файлы из `target\debug`.
+7. **Тесты и диагностика.** Добавить автоматические тесты для TOML-команд, Lua-скриптов, настроек и чата; сделать экран диагностики микрофона, Voicemod и TTS.
+8. **Интерфейс.** Доработать анимацию реактора, статусы подключения к движку и более понятные сообщения об ошибках.
+
+## Стек
+
+- Backend: Rust.
+- Desktop UI: Tauri + Svelte + Vite.
+- Распознавание речи: Vosk.
+- Wake word: Rustpotter / Vosk / Picovoice Porcupine.
+- Локальный чат: Ollama + Qwen.
+- Облачный чат: DeepSeek API.
+- Озвучивание: Silero TTS, резервно Windows SAPI.
+- Автоматизация: Lua и AutoHotkey.
+
+## Лицензия и авторство
+
+Исходный проект создан Abraham Tugalov. Лицензия: [CC BY-NC-SA 4.0](LICENSE.txt). Изменения в этом репозитории не отменяют условия исходной лицензии.
