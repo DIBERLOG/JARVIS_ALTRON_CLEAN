@@ -32,6 +32,17 @@ pub struct Settings {
     #[serde(default = "default_language")]
     pub language: String,
 
+    #[serde(default = "default_chat_provider")]
+    pub chat_provider: String,
+    #[serde(default = "default_local_chat_model")]
+    pub local_chat_model: String,
+    #[serde(default = "default_deepseek_chat_model")]
+    pub deepseek_chat_model: String,
+    #[serde(default = "default_chat_speak_responses")]
+    pub chat_speak_responses: bool,
+    #[serde(default = "default_personality")]
+    pub personality: String,
+
     pub api_keys: ApiKeys,
 }
 
@@ -39,6 +50,11 @@ fn default_intent_backend() -> String { config::DEFAULT_INTENT_BACKEND.to_string
 fn default_slots_backend() -> String { config::DEFAULT_SLOTS_BACKEND.to_string() }
 fn default_vad_backend() -> String { config::DEFAULT_VAD_BACKEND.to_string() }
 fn default_language() -> String { crate::i18n::detect_system_language().to_string() }
+fn default_chat_provider() -> String { "local".to_string() }
+fn default_local_chat_model() -> String { "qwen3:8b".to_string() }
+fn default_deepseek_chat_model() -> String { "deepseek-flash".to_string() }
+fn default_chat_speak_responses() -> bool { true }
+fn default_personality() -> String { "jarvis".to_string() }
 
 // ### KEY-VALUE ACCESS
 
@@ -58,8 +74,14 @@ impl Settings {
             "noise_suppression"         => Some(format!("{:?}", self.noise_suppression)),
             "gain_normalizer"           => Some(self.gain_normalizer.to_string()),
             "language"                  => Some(self.language.clone()),
+            "chat_provider"             => Some(self.chat_provider.clone()),
+            "local_chat_model"          => Some(self.local_chat_model.clone()),
+            "deepseek_chat_model"       => Some(self.deepseek_chat_model.clone()),
+            "chat_speak_responses"      => Some(self.chat_speak_responses.to_string()),
+            "assistant_personality"      => Some(self.personality.clone()),
             "api_key__picovoice"        => Some(self.api_keys.picovoice.clone()),
             "api_key__openai"           => Some(self.api_keys.openai.clone()),
+            "api_key__deepseek"         => Some(self.api_keys.deepseek.clone()),
             _ => None,
         }
     }
@@ -114,12 +136,21 @@ impl Settings {
             "language" => {
                 self.language = val.to_string();
             }
+            "chat_provider" => {
+                if val != "local" && val != "deepseek" { return Err("chat provider must be 'local' or 'deepseek'".into()); }
+                self.chat_provider = val.to_string();
+            }
+            "local_chat_model" => self.local_chat_model = val.to_string(),
+            "deepseek_chat_model" => self.deepseek_chat_model = val.to_string(),
+            "chat_speak_responses" => self.chat_speak_responses = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
+            "assistant_personality" => { if val != "jarvis" && val != "altron" { return Err("personality must be jarvis or altron".into()) }; self.personality = val.to_string(); }
             "api_key__picovoice" => {
                 self.api_keys.picovoice = val.to_string();
             }
             "api_key__openai" => {
                 self.api_keys.openai = val.to_string();
             }
+            "api_key__deepseek" => self.api_keys.deepseek = val.to_string(),
             _ => return Err(format!("unknown setting: '{}'", key)),
         }
         Ok(())
@@ -140,8 +171,14 @@ impl Settings {
             "noise_suppression",
             "gain_normalizer",
             "language",
+            "chat_provider",
+            "local_chat_model",
+            "deepseek_chat_model",
+            "chat_speak_responses",
+            "assistant_personality",
             "api_key__picovoice",
             "api_key__openai",
+            "api_key__deepseek",
         ]
     }
 }
@@ -169,9 +206,16 @@ impl Default for Settings {
 
             language: crate::i18n::detect_system_language().to_string(),
 
+            chat_provider: default_chat_provider(),
+            local_chat_model: default_local_chat_model(),
+            deepseek_chat_model: default_deepseek_chat_model(),
+            chat_speak_responses: default_chat_speak_responses(),
+            personality: default_personality(),
+
             api_keys: ApiKeys {
                 picovoice: String::from(""),
                 openai: String::from(""),
+                deepseek: String::from(""),
             },
         }
     }
@@ -181,4 +225,6 @@ impl Default for Settings {
 pub struct ApiKeys {
     pub picovoice: String,
     pub openai: String,
+    #[serde(default)]
+    pub deepseek: String,
 }

@@ -99,6 +99,11 @@ fn main() {
             tauri_commands::list_voices,
             tauri_commands::get_voice,
             tauri_commands::preview_voice,
+
+            // chat
+            tauri_commands::chat_get_config,
+            tauri_commands::chat_send,
+            tauri_commands::chat_search_web,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

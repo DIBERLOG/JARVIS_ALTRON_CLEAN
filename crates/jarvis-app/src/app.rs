@@ -1,10 +1,13 @@
 use std::sync::mpsc::Receiver;
 use std::time::SystemTime;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use jarvis_core::{audio_buffer::AudioRingBuffer, audio_processing, commands, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots};
+use jarvis_core::{audio_buffer::AudioRingBuffer, audio_processing, commands, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, tts};
 use rand::seq::SliceRandom;
 
 use crate::should_stop;
+
+static DIALOGUE_MODE: AtomicBool = AtomicBool::new(false);
 
 // VAD state machine
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,6 +56,17 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
             voices::play_goodbye();
             ipc::send(IpcEvent::Stopping);
             break;
+        }
+
+        // Do not feed Jarvis's own spoken answer back into wake-word detection.
+        if tts::is_speaking() {
+            recorder::read_microphone(&mut frame_buffer);
+            audio_buffer.clear();
+            vad_state = VadState::WaitingForVoice;
+            stt::reset_wake_recognizer();
+            stt::reset_speech_recognizer();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            continue 'wake_word;
         }
 
         if let Ok(text) = text_cmd_rx.try_recv() {
@@ -251,15 +265,7 @@ fn recognize_command(
 
                     first_recognition = false;
                     
-                    // filter activation phrases
-                    // for tbr in config::ASSISTANT_PHRASES_TBR {
-                    //     recognized_voice = recognized_voice.replace(tbr, "");
-                    // }
-                    for tbr in config::get_phrases_to_remove(&i18n::get_language()) {
-                        recognized_voice = recognized_voice.replace(tbr, "");
-                    }
-
-                    recognized_voice = recognized_voice.trim().to_string();
+                    recognized_voice = remove_assistant_phrases(recognized_voice);
                     
                     if recognized_voice.len() < 5 {
                         debug!("Ignoring too short recognition: '{}'", recognized_voice);
@@ -320,13 +326,7 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
     
     ipc::send(IpcEvent::SpeechRecognized { text: text.to_string() });
     
-    let mut filtered = text.to_lowercase();
-    // for tbr in config::ASSISTANT_PHRASES_TBR {
-    //     filtered = filtered.replace(tbr, "");
-    // }
-    for tbr in config::get_phrases_to_remove(&i18n::get_language()) {
-        filtered = filtered.replace(tbr, "");
-    }
+    let filtered = remove_assistant_phrases(text.to_lowercase());
 
     let filtered = filtered.trim();
     
@@ -342,6 +342,17 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
+    if text.contains("давай пообщаемся") || text.contains("давай поговорим") {
+        DIALOGUE_MODE.store(true, Ordering::SeqCst);
+        tts::speak("Режим диалога активирован. Скажите, сэр.");
+        return true;
+    }
+    if DIALOGUE_MODE.load(Ordering::SeqCst) {
+        if text.contains("закончи разговор") || text.contains("закончим разговор") || text.contains("хватит общаться") {
+            DIALOGUE_MODE.store(false, Ordering::SeqCst); tts::speak("Диалоговый режим отключён."); return false;
+        }
+        match jarvis_core::chat::ask(text) { Ok(answer) => { tts::speak(&answer); return true; }, Err(error) => { warn!("Dialogue chat failed: {}", error); tts::speak("Не удалось получить ответ."); return true; } }
+    }
     let commands_list = match COMMANDS_LIST.get() {
         Some(c) => c,
         None => {
@@ -415,4 +426,19 @@ pub fn close(code: i32) {
     voices::play_goodbye();
     ipc::send(IpcEvent::Stopping);
     std::process::exit(code);
+}
+
+fn remove_assistant_phrases(mut text: String) -> String {
+    for phrase in config::get_phrases_to_remove(&i18n::get_language()) {
+        if text == *phrase {
+            return String::new();
+        }
+
+        if let Some(rest) = text.strip_prefix(phrase) {
+            if let Some(rest) = rest.strip_prefix(char::is_whitespace) {
+                text = rest.trim_start().to_string();
+            }
+        }
+    }
+    text
 }

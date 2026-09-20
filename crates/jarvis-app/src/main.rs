@@ -19,10 +19,6 @@ mod log;
 // include app
 mod app;
 
-// include tray
-// @TODO. macOS currently not supported for tray functionality.
-#[cfg(not(target_os = "macos"))]
-mod tray;
 
 static SHOULD_STOP: AtomicBool = AtomicBool::new(false);
 
@@ -163,8 +159,13 @@ fn main() -> Result<(), String> {
         let _ = app::start(text_cmd_rx, &app_rt);
     });
 
-    tray::init_blocking(settings);
-
+    // The tray shell is intentionally disabled on this Windows build: its menu
+    // dependency imports TaskDialogIndirect, which is unavailable on this PC.
+    // The GUI remains the control surface and the assistant threads stay alive.
+    loop {
+        if SHOULD_STOP.load(Ordering::SeqCst) { break; }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
     Ok(())
 }
 

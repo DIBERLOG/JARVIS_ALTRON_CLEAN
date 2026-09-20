@@ -78,19 +78,22 @@ pub fn register(lua: &Lua, jarvis: &Table, sandbox: SandboxLevel) -> mlua::Resul
         #[cfg(target_os = "windows")]
         {
             use winrt_notification::{Toast, Duration as ToastDuration};
-            
-            if let Err(e) = Toast::new(Toast::POWERSHELL_APP_ID)
-                .title(&title)
-                .text1(&message)
-                .duration(ToastDuration::Short)
-                .show()
-            {
-                log::warn!("[Lua] Failed to show toast notification: {}", e);
-                // fallback to msg.exe
-                let _ = Command::new("msg")
-                    .args(["*", "/time:10", &format!("{}: {}", title, message)])
-                    .spawn();
-            }
+
+            // Toast::show may wait on Windows notification infrastructure.
+            // It must not postpone the assistant's spoken response.
+            std::thread::spawn(move || {
+                if let Err(e) = Toast::new(Toast::POWERSHELL_APP_ID)
+                    .title(&title)
+                    .text1(&message)
+                    .duration(ToastDuration::Short)
+                    .show()
+                {
+                    log::warn!("[Lua] Failed to show toast notification: {}", e);
+                    let _ = Command::new("msg")
+                        .args(["*", "/time:10", &format!("{}: {}", title, message)])
+                        .spawn();
+                }
+            });
         }
         
         #[cfg(target_os = "linux")]

@@ -53,3 +53,10 @@ tree.txt
 
 # Ignore AI models
 /resources/models/*
+
+# Local Python environment and generated voice-training artifacts
+/tools/voice_training/.venv/
+/tools/voice_training/__pycache__/
+/tools/voice_training/smoke_output/
+/tools/voice_training/*.log
+/tools/voice_training/*test.wav

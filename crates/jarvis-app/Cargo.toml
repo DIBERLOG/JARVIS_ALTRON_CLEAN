@@ -11,18 +11,12 @@ jarvis-core = { path = "../jarvis-core", features = ["intent"] }
 once_cell.workspace = true
 log.workspace = true
 simple-log = "2.4"
-tray-icon = "0.21"
-winit = "0.30"
 image.workspace = true
 platform-dirs.workspace = true
 rand.workspace = true
 parking_lot.workspace = true
 
 tokio = { version = "1", features = ["rt-multi-thread"] }
-
-[target.'cfg(windows)'.dependencies.winit]
-version = "0.30"
-features = []
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winuser"] }

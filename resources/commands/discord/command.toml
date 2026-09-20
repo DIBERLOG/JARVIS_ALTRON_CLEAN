@@ -1,0 +1,13 @@
+[[commands]]
+id = "discord_open"
+type = "ahk"
+exe_path = "ahk/Open Discord.exe"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["открой дискорд", "запусти дискорд", "включи дискорд", "дискорд"]
+
+[[commands]]
+id = "discord_close"
+type = "ahk"
+exe_path = "ahk/Close Discord.exe"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["закрой дискорд", "выключи дискорд", "отключи дискорд"]

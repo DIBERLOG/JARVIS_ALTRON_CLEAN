@@ -6,8 +6,8 @@ timeout = 5000
 sandbox = "standard"
 
 [commands.phrases]
-ru = ["какая погода в {city}", "погода {city}"]
-en = ["what's the weather in {city}", "weather in {city}"]
+ru = ["какая погода", "погода", "какая погода в {city}", "погода в {city}"]
+en = ["what's the weather", "weather", "what's the weather in {city}", "weather in {city}"]
 
 [commands.sounds]
 ru = ["weather_ru_1", "weather_ru_2"]
@@ -24,8 +24,15 @@ type = "lua"
 script = "set_city.lua"
 sandbox = "standard"
 timeout = 5000
-phrases = [
-    "установи город",
-    "set city",
-    "change city",
-]
+
+[commands.phrases]
+ru = ["установи город {city}", "измени город на {city}", "город {city}"]
+en = ["set city {city}", "change city to {city}"]
+
+[commands.sounds]
+ru = ["ok1", "ok2", "ok3"]
+en = ["ok1", "ok2", "ok3"]
+
+[commands.slots.city]
+entity = "city name"
+context = ["город", "на", "в", "city", "to", "in"]

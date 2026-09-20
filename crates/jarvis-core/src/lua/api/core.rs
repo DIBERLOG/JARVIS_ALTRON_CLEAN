@@ -1,6 +1,7 @@
 // Core Lua API: log, sleep, print, etc.
 
 use mlua::{Lua, Table, MultiValue};
+use crate::tts;
 
 pub fn register(lua: &Lua, jarvis: &Table) -> mlua::Result<()> {
 
@@ -38,11 +39,8 @@ pub fn register(lua: &Lua, jarvis: &Table) -> mlua::Result<()> {
     jarvis.set("sleep", sleep_fn)?;
     
     // @ jarvis.speak(text)
-    // @TODO: update when TTS will be implemented
     let speak_fn = lua.create_function(|_, text: String| {
-        log::info!("[Lua] SPEAK: {}", text);
-        // pass
-        Ok(())
+        Ok(tts::speak(&text))
     })?;
     jarvis.set("speak", speak_fn)?;
     

@@ -1,0 +1,13 @@
+[[commands]]
+id = "twitch_open"
+type = "ahk"
+exe_path = "ahk/Open Twitch.exe"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["открой твич", "запусти твич", "включи твич", "твич"]
+
+[[commands]]
+id = "twitch_close"
+type = "ahk"
+exe_path = "ahk/Close Twitch.exe"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["закрой твич", "выключи твич", "отключи твич"]

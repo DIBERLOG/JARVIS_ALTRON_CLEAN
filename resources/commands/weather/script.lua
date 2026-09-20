@@ -2,8 +2,12 @@
 
 local lang = jarvis.context.language
 
--- get saved city or use default
-local city = jarvis.state.get("city") or "Moscow"
+-- Use a city named in the command when present; otherwise use the saved city.
+-- Examples: "погода в Казани" and "weather in London".
+local phrase = jarvis.context.phrase or ""
+local requested_city = phrase:match("погода%s+в%s+(.+)")
+    or phrase:match("weather%s+in%s+(.+)")
+local city = requested_city or jarvis.state.get("city") or "Moscow"
 
 jarvis.log("info", "Fetching weather for: " .. city)
 
@@ -19,8 +23,7 @@ if response.ok then
     -- show notification
     local title = lang == "ru" and "Погода" or "Weather"
     jarvis.system.notify(title, response.body)
-    
-    jarvis.audio.play_ok()
+    jarvis.speak(response.body)
 else
     jarvis.log("error", "Failed to fetch weather: " .. (response.error or "unknown error"))
     jarvis.audio.play_error()

@@ -9,6 +9,7 @@ local city = phrase:match("город%s+(.+)") or phrase:match("city%s+(.+)")
 
 if city then
     city = city:gsub("^%s*(.-)%s*$", "%1") -- trim
+    city = city:gsub("^на%s+", "")
     
     -- save to state (shared with weather command)
     jarvis.state.set("city", city)
@@ -19,7 +20,7 @@ if city then
     
     jarvis.log("info", msg)
     jarvis.system.notify("Jarvis", msg)
-    jarvis.audio.play_ok()
+    jarvis.speak(msg)
 else
     local msg = lang == "ru"
         and "Не удалось определить город"

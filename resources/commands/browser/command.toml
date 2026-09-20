@@ -32,6 +32,30 @@ phrases.ua = [
     "потрібен браузер",
 ]
 
+[[commands]]
+id = "open_youtube"
+type = "ahk"
+exe_path = "ahk/Run website.exe"
+exe_args = ["https://www.youtube.com/"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["открой ютуб", "запусти ютуб", "включи ютуб", "ютуб"]
+
+[[commands]]
+id = "open_chatgpt"
+type = "ahk"
+exe_path = "ahk/Run website.exe"
+exe_args = ["https://chatgpt.com/"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["открой чат гпт", "открой chatgpt", "запусти чат гпт", "чат гпт"]
+
+[[commands]]
+id = "open_schedule"
+type = "ahk"
+exe_path = "ahk/Run website.exe"
+exe_args = ["https://kmpo.eljur.ru/journal-app/u.84286/week.0?user=Diberlog&domain=kmpo"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["открой расписание", "покажи расписание", "расписание"]
+
 
 
 [[commands]]

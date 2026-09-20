@@ -1,0 +1,44 @@
+[[commands]]
+id = "jarvis_restart"
+type = "restart"
+exe_path = "ahk/Restart Jarvis.exe"
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["перезагрузись", "перезагрузи себя", "перезапусти джарвиса"]
+
+[[commands]]
+id = "computer_restart"
+type = "cli"
+cli_cmd = "shutdown"
+cli_args = ["/r", "/t", "0"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["перезагрузи компьютер", "перезапусти компьютер", "перезагрузи виндовс"]
+
+[[commands]]
+id = "jarvis_stupid"
+type = "voice"
+sounds.ru = ["stupid"]
+phrases.ru = ["ты дурак", "ты дебил", "ты глупый", "ты тупой"]
+
+[[commands]]
+id = "jarvis_thanks"
+type = "voice"
+sounds.ru = ["thanks"]
+phrases.ru = ["спасибо", "молодец", "респект", "ты супер", "отличная работа", "ты крут"]
+
+[[commands]]
+id = "jarvis_joke"
+type = "voice"
+sounds.ru = ["joke1", "joke2", "joke3", "joke4", "joke5", "joke6", "joke7", "joke8"]
+phrases.ru = ["расскажи анекдот", "рассмеши", "пошути", "шутка", "расскажи шутку", "развесели меня", "хочу анекдот"]
+
+[[commands]]
+id = "jarvis_joke_thanks"
+type = "voice"
+sounds.ru = ["thanks"]
+phrases.ru = ["классная шутка", "очень смешно", "ты меня рассмешил", "веселая шутка", "смешной анекдот"]
+
+[[commands]]
+id = "jarvis_how_are_you"
+type = "voice"
+sounds.ru = ["reply1", "reply2", "reply3", "reply4", "reply5", "reply6"]
+phrases.ru = ["как дела", "как ты", "как настроение", "как поживаешь", "как твои дела"]

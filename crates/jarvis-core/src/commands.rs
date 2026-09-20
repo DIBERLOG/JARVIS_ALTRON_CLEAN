@@ -221,6 +221,20 @@ pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option
                 .map(|_| true)
                 .map_err(|e| format!("AHK process spawn error: {}", e))
         }
+
+        // Start a replacement Jarvis process, then end this process after the
+        // restart helper has had time to take over.
+        "restart" => {
+            let restart_helper = cmd_path.join(&cmd_config.exe_path);
+            execute_exe(restart_helper.to_str().unwrap(), &cmd_config.exe_args)
+                .map_err(|e| format!("Jarvis restart error: {}", e))?;
+
+            std::thread::spawn(|| {
+                std::thread::sleep(Duration::from_millis(500));
+                std::process::exit(0);
+            });
+            Ok(false)
+        }
         
         // CLI command type
         // @TODO: Consider security restrictions
