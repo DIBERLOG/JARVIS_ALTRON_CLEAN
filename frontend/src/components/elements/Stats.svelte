@@ -69,8 +69,8 @@
 </div>
 
 <style lang="scss">
-    .stats-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem 1.6rem; width: min(100%, 980px); margin: 0 auto; padding: 1.25rem 1.5rem; }
-    .stat-item { display: flex; min-width: 0; align-items: flex-start; gap: .6rem; }
+    .stats-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); justify-items: center; gap: 1rem 1.6rem; width: min(100%, 900px); margin: 0 auto; padding: 1.25rem 1.5rem; }
+    .stat-item { display: flex; width: min(100%, 210px); min-width: 0; align-items: flex-start; gap: .6rem; }
     .stat-item div { display: flex; min-width: 0; flex-direction: column; gap: .18rem; }
     .stat-item b { color: #edfafa; font-size: .73rem; letter-spacing: .05em; }
     .stat-item small { color: rgba(220, 245, 247, .58); font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
