@@ -39,7 +39,20 @@ if weather and weather.current_condition and weather.current_condition[1] and we
         end
         jarvis.log("info", "Weather: " .. visual)
         jarvis.system.notify(title, visual)
-        jarvis.speak(spoken)
+        local recorded_exact = false
+        if lang == "ru" then
+            -- A complete recording for this value takes priority when available.
+            if temp >= -30 and temp <= 30 then
+                recorded_exact = jarvis.audio.play_command_reply("weather_" .. temp)
+            end
+            if not recorded_exact then
+                local fallback = temp > 0 and "weather_plus"
+                    or (temp < 0 and "weather_minus" or "weather_zero")
+                jarvis.audio.play_command_reply(fallback)
+            end
+        end
+        -- Until every temperature is recorded, keep speaking the exact number.
+        if not recorded_exact then jarvis.speak(spoken) end
     else
         jarvis.audio.play_error()
     end

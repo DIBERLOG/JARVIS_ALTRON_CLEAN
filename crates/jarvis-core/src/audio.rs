@@ -74,6 +74,20 @@ pub fn play_sound(filename: &PathBuf) {
     }
 }
 
+pub fn play_sound_blocking(filename: &PathBuf) -> bool {
+    match AUDIO_TYPE.get() {
+        Some(AudioType::Rodio) => {
+            rodio::play_sound(filename, true);
+            true
+        }
+        Some(AudioType::Kira) => kira::play_sound_blocking(filename),
+        None => {
+            warn!("Audio not initialized, cannot play: {}", filename.display());
+            false
+        }
+    }
+}
+
 pub fn get_sound_directory() -> Option<PathBuf> {
     let db = DB.get()?;
 

@@ -69,6 +69,7 @@
     let availableVoskModels: { label: string; value: string }[] = []
     let availableGlinerModels: { label: string; value: string }[] = []
     let settingsSaved = false
+    let saveError = ""
     let saveButtonDisabled = false
 
     // form values (state vars)
@@ -83,6 +84,8 @@
     let selectedVad = ""
     let gainNormalizerEnabled = false
     let voiceDialoguePersonality = "jarvis"
+    let ttsMode = "xtts"
+    let monitorSelf = false
     let apiKeyPicovoice = ""
     let apiKeyOpenai = ""
 
@@ -102,25 +105,26 @@
     async function saveSettings() {
         saveButtonDisabled = true
         settingsSaved = false
+        saveError = ""
 
         try {
-            await Promise.all([
-                invoke("db_write", { key: "assistant_voice", val: voiceVal }),
-                invoke("db_write", { key: "selected_microphone", val: selectedMicrophone }),
-                invoke("db_write", { key: "selected_wake_word_engine", val: selectedWakeWordEngine }),
-                invoke("db_write", { key: "intent_backend", val: selectedIntentRecognitionEngine }),
-                invoke("db_write", { key: "slots_backend", val: selectedSlotExtractionEngine }),
-                invoke("db_write", { key: "selected_gliner_model", val: selectedGlinerModel }),
-                invoke("db_write", { key: "selected_vosk_model", val: selectedVoskModel }),
-
-                invoke("db_write", { key: "noise_suppression", val: selectedNoiseSuppression }),
-                invoke("db_write", { key: "vad_backend", val: selectedVad }),
-                invoke("db_write", { key: "gain_normalizer", val: gainNormalizerEnabled.toString() }),
-                invoke("db_write", { key: "voice_dialogue_personality", val: voiceDialoguePersonality }),
-
-                invoke("db_write", { key: "api_key__picovoice", val: apiKeyPicovoice }),
-                invoke("db_write", { key: "api_key__openai", val: apiKeyOpenai })
-            ])
+            await invoke("db_write_many", { entries: [
+                { key: "assistant_voice", val: voiceVal },
+                { key: "selected_microphone", val: selectedMicrophone },
+                { key: "selected_wake_word_engine", val: selectedWakeWordEngine },
+                { key: "intent_backend", val: selectedIntentRecognitionEngine },
+                { key: "slots_backend", val: selectedSlotExtractionEngine },
+                { key: "selected_gliner_model", val: selectedGlinerModel },
+                { key: "selected_vosk_model", val: selectedVoskModel },
+                { key: "noise_suppression", val: selectedNoiseSuppression },
+                { key: "vad_backend", val: selectedVad },
+                { key: "gain_normalizer", val: gainNormalizerEnabled.toString() },
+                { key: "voice_dialogue_personality", val: voiceDialoguePersonality },
+                { key: "api_key__picovoice", val: apiKeyPicovoice },
+                { key: "api_key__openai", val: apiKeyOpenai },
+                { key: "tts_mode", val: ttsMode },
+                { key: "monitor_self", val: String(monitorSelf) }
+            ] })
 
             // update shared store
             assistantVoice.set(voiceVal)
@@ -135,11 +139,10 @@
             // stopListening(() => startListening())
         } catch (err) {
             console.error("failed to save settings:", err)
-        }
-
-        setTimeout(() => {
+            saveError = `Не удалось сохранить настройки: ${String(err)}`
+        } finally {
             saveButtonDisabled = false
-        }, 1000)
+        }
     }
 
     // ### INIT
@@ -189,7 +192,7 @@
 
             // load settings from db
             const [mic, wakeWord, intentReco, slotEngine, glinerModel, voskModel,
-                   noiseSuppression, vad, gainNormalizer, dialoguePersonality,
+                   noiseSuppression, vad, gainNormalizer, dialoguePersonality, savedTtsMode, savedMonitorSelf,
                    pico, openai] = await Promise.all([
                 invoke<string>("db_read", { key: "selected_microphone" }),
                 invoke<string>("db_read", { key: "selected_wake_word_engine" }),
@@ -202,6 +205,8 @@
                 invoke<string>("db_read", { key: "vad_backend" }),
                 invoke<string>("db_read", { key: "gain_normalizer" }),
                 invoke<string>("db_read", { key: "voice_dialogue_personality" }),
+                invoke<string>("db_read", { key: "tts_mode" }),
+                invoke<string>("db_read", { key: "monitor_self" }),
 
                 invoke<string>("db_read", { key: "api_key__picovoice" }),
                 invoke<string>("db_read", { key: "api_key__openai" })
@@ -217,6 +222,8 @@
             selectedVad = vad
             gainNormalizerEnabled = gainNormalizer === "true"
             voiceDialoguePersonality = dialoguePersonality === "altron" ? "altron" : "jarvis"
+            ttsMode = savedTtsMode === "xtts" ? "xtts" : "silero"
+            monitorSelf = savedMonitorSelf === "true"
             apiKeyPicovoice = pico
             apiKeyOpenai = openai
         } catch (err) {
@@ -258,6 +265,12 @@
     />
     <Space h="xl" />
 {/if}
+{#if saveError}
+    <Notification title="Ошибка сохранения" color="red" on:close={() => { saveError = "" }}>
+        {saveError}
+    </Notification>
+    <Space h="xl" />
+{/if}
 
 <Tabs class="form" color="#8AC832" position="left">
     <Tabs.Tab label={t('settings-general')} icon={Gear}>
@@ -276,8 +289,26 @@
             </div>
         </section>
         <Space h="xl" />
+        <section class="tts-mode" aria-labelledby="tts-mode-title">
+            <p class="module-label">ОЗВУЧКА ОТВЕТОВ</p>
+            <h3 id="tts-mode-title">Как будет говорить ассистент</h3>
+            <p>Выбор для чата, диалога и других ответов, созданных на лету. Готовые звуки команд не меняются.</p>
+            <div class="tts-mode-options">
+                <button type="button" class:active={ttsMode === "xtts"} on:click={() => ttsMode = "xtts"} aria-pressed={ttsMode === "xtts"}>
+                    <strong>Обученный голос XTTS</strong><span>Выбранный тобой пробный голос. Звук идёт сразу в наушники, без Voicemod. Для работы нужна локально сохранённая модель.</span>
+                </button>
+                <button type="button" class:active={ttsMode === "silero"} on:click={() => ttsMode = "silero"} aria-pressed={ttsMode === "silero"}>
+                    <strong>Silero + Voicemod</strong><span>Звук идёт через виртуальный кабель. Пресет Evil AI выбери в Voicemod.</span>
+                </button>
+            </div>
+            <label class="monitor-self-option">
+                <input type="checkbox" bind:checked={monitorSelf} />
+                <span><strong>Слышать себя в наушниках</strong><small>Отдельное прослушивание обычного микрофона. Не влияет на звук Jarvis через VB-CABLE и Voicemod. Выключено по умолчанию.</small></span>
+            </label>
+        </section>
+        <Space h="xl" />
         <div class="voice-select">
-            <label>{t('settings-voice')}</label>
+            <p class="voice-heading">{t('settings-voice')}</p>
             <p class="description">{t('settings-voice-desc')}</p>
             
             <div class="voice-options">
@@ -548,6 +579,21 @@
 .personality-options button:hover { transform: translateY(-1px); border-color: rgba(82, 254, 254, .55); }
 .personality-options button.active { color: #fff; background: linear-gradient(135deg, rgba(6, 102, 110, .8), rgba(15, 38, 43, .85)); border-color: #52fefe; box-shadow: 0 0 18px rgba(82, 254, 254, .12); }
 .dialogue-personality.altron .personality-options button.active:last-child { background: linear-gradient(135deg, rgba(126, 35, 25, .85), rgba(42, 14, 17, .88)); border-color: #ff6952; box-shadow: 0 0 18px rgba(255, 92, 72, .12); }
+.tts-mode { padding: 1rem; border: 1px solid rgba(82, 254, 254, .34); background: linear-gradient(120deg, rgba(8, 65, 72, .26), rgba(7, 12, 14, .36)); }
+.tts-mode h3 { color: #edfafa; margin: .2rem 0; font: 700 1.1rem "Roboto Condensed", sans-serif; letter-spacing: .05em; }
+.tts-mode > p:not(.module-label) { color: rgba(222, 241, 243, .65); font-size: .78rem; margin: 0 0 .85rem; }
+.tts-mode-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.tts-mode-options button { text-align: left; padding: .75rem; background: rgba(8, 28, 31, .72); border: 1px solid rgba(126, 183, 188, .26); color: #c4d6d9; cursor: pointer; transition: border-color .18s ease, background .18s ease; }
+.tts-mode-options button:hover { border-color: rgba(82, 254, 254, .55); }
+.tts-mode-options button.active { color: #fff; background: linear-gradient(135deg, rgba(6, 102, 110, .8), rgba(15, 38, 43, .85)); border-color: #52fefe; box-shadow: 0 0 18px rgba(82, 254, 254, .12); }
+.tts-mode-options strong, .tts-mode-options span { display: block; }
+.tts-mode-options strong { font: 700 .83rem "Roboto Condensed", sans-serif; letter-spacing: .04em; }
+.tts-mode-options span { margin-top: .28rem; font-size: .7rem; line-height: 1.35; opacity: .75; }
+.monitor-self-option { display: flex; align-items: flex-start; gap: .7rem; margin-top: .8rem; padding: .7rem; border: 1px solid rgba(126, 183, 188, .26); border-radius: 7px; background: rgba(8, 28, 31, .72); cursor: pointer; }
+.monitor-self-option input { margin-top: .1rem; accent-color: #52fefe; width: 17px; height: 17px; flex: none; }
+.monitor-self-option strong, .monitor-self-option small { display: block; }
+.monitor-self-option small { color: rgba(222, 241, 243, .65); font-size: .7rem; line-height: 1.35; margin-top: .25rem; }
+@media (max-width: 520px) { .tts-mode-options { grid-template-columns: 1fr; } }
 .personality-options strong, .personality-options span { display: block; }
 .personality-options strong { font: 700 .83rem "Roboto Condensed", sans-serif; letter-spacing: .08em; }
 .personality-options span { margin-top: .28rem; font-size: .7rem; line-height: 1.35; opacity: .75; }
@@ -556,7 +602,7 @@
 .voice-select {
     margin-bottom: 1rem;
     
-    label {
+    .voice-heading {
         font-weight: 600;
         font-size: 0.9rem;
         color: #fff;

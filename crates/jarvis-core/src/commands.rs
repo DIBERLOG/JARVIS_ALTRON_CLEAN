@@ -331,3 +331,79 @@ fn execute_lua_command(
         }
     }
 }
+
+/// Prefer a phrase the user actually said over a model prediction.
+pub fn fetch_exact_command<'a>(
+    phrase: &str,
+    commands: &'a [JCommandsList],
+) -> Option<(&'a PathBuf, &'a JCommand)> {
+    let lang = i18n::get_language();
+    let spoken = normalize_phrase(phrase);
+    if spoken.is_empty() {
+        return None;
+    }
+
+    for list in commands {
+        for command in &list.commands {
+            if command.get_phrases(&lang).iter()
+                .any(|candidate| normalize_phrase(candidate) == spoken) {
+                return Some((&list.path, command));
+            }
+        }
+    }
+
+    for list in commands {
+        for command in &list.commands {
+            if command.get_phrases(&lang).iter()
+                .any(|candidate| matches_phrase_template(&spoken, candidate)) {
+                return Some((&list.path, command));
+            }
+        }
+    }
+    None
+}
+
+fn matches_phrase_template(spoken: &str, template: &str) -> bool {
+    let template = normalize_phrase(template);
+    let Some((prefix, rest)) = template.split_once('{') else {
+        return false;
+    };
+    let Some((slot, suffix)) = rest.split_once('}') else {
+        return false;
+    };
+    if slot.is_empty() || spoken.len() <= prefix.len() + suffix.len()
+        || !spoken.starts_with(prefix) || !spoken.ends_with(suffix) {
+        return false;
+    }
+    let middle = &spoken[prefix.len()..spoken.len() - suffix.len()];
+    !middle.trim().is_empty()
+}
+
+fn normalize_phrase(phrase: &str) -> String {
+    phrase.trim()
+        .trim_matches(|c: char| matches!(c, '.' | ',' | '!' | '?' | ':' | ';' | '«' | '»' | '…'))
+        .to_lowercase()
+        .replace('ё', "е")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[cfg(test)]
+mod phrase_tests {
+    use super::{matches_phrase_template, normalize_phrase};
+
+    #[test]
+    fn exact_phrases_ignore_punctuation_and_yo() {
+        assert_eq!(normalize_phrase("  Открой Дискорд! "), "открой дискорд");
+        assert_eq!(normalize_phrase("счётчик"), "счетчик");
+    }
+
+    #[test]
+    fn name_templates_need_a_nonempty_name() {
+        assert!(matches_phrase_template("поздоровайся с иваном", "поздоровайся с {name}"));
+        assert!(matches_phrase_template("привет анна", "привет {name}"));
+        assert!(!matches_phrase_template("поздоровайся с", "поздоровайся с {name}"));
+        assert!(!matches_phrase_template("привет", "привет {name}"));
+    }
+}

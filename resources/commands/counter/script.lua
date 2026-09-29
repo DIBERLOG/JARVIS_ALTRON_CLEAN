@@ -11,6 +11,6 @@ local msg = lang == "ru"
 
 jarvis.log("info", msg)
 jarvis.system.notify("Counter", tostring(count))
-jarvis.audio.play_ok()
+jarvis.speak(msg)
 
-return { chain = true }
+return { chain = false }

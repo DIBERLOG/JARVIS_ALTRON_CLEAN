@@ -1,140 +1,120 @@
 <script lang="ts">
-    import { onMount } from "svelte"
-    import { invoke } from "@tauri-apps/api/core"
-    import { appInfo, currentLanguage, translations, translate } from "@/stores"
+    import { currentLanguage } from "@/stores"
 
-    $: t = (key: string) => translate($translations, key)
+    const forkGithub = "https://github.com/DIBERLOG"
+    const originalGithub = "https://github.com/Priler/jarvis"
+    const originalTelegram = "https://t.me/howdyho_official"
+    const originalBoosty = "https://boosty.to/howdyho"
 
-    let authorName = ""
-    let tgLink = ""
-    let repoLink = ""
-    let boostyLink = ""
-    let patreonLink = ""
-
-    const currentYear = new Date().getFullYear()
-
-    appInfo.subscribe(info => {
-        tgLink = info.tgOfficialLink
-        repoLink = info.repositoryLink
-        boostyLink = info.boostySupportLink
-        patreonLink = info.patreonSupportLink
-    })
-
-    onMount(async () => {
-        try {
-            authorName = await invoke<string>("get_author_name")
-        } catch (err) {
-            console.error("failed to get author name:", err)
-        }
-    })
+    $: isRussian = $currentLanguage === "ru"
 </script>
 
-<footer id="footer">
-    <p>© {currentYear}. {t('footer-author')}: <b>{authorName}</b></p>
-    <p class="links">
-        {#if $currentLanguage === "ru" || $currentLanguage === "ua"}
-        <a href={tgLink} target="_blank" class="telegram-link">
-            <img src="/media/icons/telegram.webp" alt="Telegram" width="18px" />
-            &nbsp;<span>{t('footer-telegram')}</span>
+<footer class="credits">
+    <div class="fork-credit">
+        <span class="credit-marker" aria-hidden="true"></span>
+        <div>
+            <span class="credit-label">{isRussian ? "АВТОР ФОРКА" : "FORK AUTHOR"}</span>
+            <strong>Егор Ангелов</strong>
+        </div>
+        <a href={forkGithub} target="_blank" rel="noopener noreferrer" aria-label="GitHub Егора Ангелова">
+            GitHub <span aria-hidden="true">↗</span>
         </a>
-        &nbsp;
-        {/if}
-        <a href={repoLink} target="_blank">
-            <img src="/media/icons/github-logo.png" alt="GitHub" width="18px" />
-            &nbsp;<span>{t('footer-github')}</span>
-        </a>
-    </p>
-    <p class="links last">
-        {#if $currentLanguage === "ru"}
-        {t('footer-support')} <a href={boostyLink} target="_blank" class="telegram-link">
-            <img src="/media/icons/boosty.webp" alt="Boosty" width="18px" />
-            <span>Boosty</span>
-        </a>.
-        {/if}
-        {#if $currentLanguage === "ua" || $currentLanguage === "en"}
-        {t('footer-support')} <a href={patreonLink} target="_blank" class="telegram-link">
-            <img src="/media/icons/patreon.png" alt="Patreon" width="18px" />
-            <span>Patreon</span>
-        </a>.
-        {/if}
-    </p>
+    </div>
+
+    <details class="original-credits">
+        <summary>
+            <span>{isRussian ? "Первоначальный автор и ссылки проекта" : "Original author and project links"}</span>
+            <span class="chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="original-content">
+            <p>© 2026. {isRussian ? "Первоначальный автор проекта:" : "Original project author:"} <strong>Abraham Tugalov</strong></p>
+            <div class="original-links">
+                <a href={originalTelegram} target="_blank" rel="noopener noreferrer">{isRussian ? "Наш телеграм канал" : "Telegram channel"}</a>
+                <a href={originalGithub} target="_blank" rel="noopener noreferrer">{isRussian ? "GitHub репозиторий проекта" : "Original GitHub repository"}</a>
+                <a href={originalBoosty} target="_blank" rel="noopener noreferrer">{isRussian ? "Поддержать проект на Boosty" : "Support on Boosty"}</a>
+            </div>
+        </div>
+    </details>
 </footer>
 
 <style lang="scss">
-    #footer {
-        text-align: center;
-        color: #6c6e71;
-        font-size: 13px;
-        font-weight: normal;
-        line-height: 1.7em;
-        margin-top: 15px;
+    .credits {
+        width: min(100%, 520px);
+        margin: 42px auto 16px;
+        color: #abc1c5;
+        font-family: "Roboto Condensed", sans-serif;
+    }
 
-        p {
-            margin: 0;
-            padding: 0;
+    .fork-credit {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 13px 16px;
+        border: 1px solid rgba(82, 254, 254, 0.18);
+        border-radius: 8px;
+        background: linear-gradient(110deg, rgba(17, 60, 68, 0.54), rgba(12, 22, 29, 0.82) 68%);
+        box-shadow: inset 0 1px 0 rgba(82, 254, 254, 0.06);
+    }
 
-            &.links {
-                margin-top: 5px;
-                margin-bottom: 15px;
+    .credit-marker {
+        width: 7px;
+        height: 26px;
+        border-radius: 6px;
+        background: #52fefe;
+        box-shadow: 0 0 15px rgba(82, 254, 254, 0.56);
+        flex: none;
+    }
 
-                &.last {
-                    margin-top: -5px;
-                }
-            }
-        }
+    .fork-credit div { display: grid; gap: 2px; }
+    .credit-label { color: #6fa3ab; font-size: 10px; font-weight: 700; letter-spacing: .14em; }
+    .fork-credit strong { color: #f1fcfc; font-size: 16px; letter-spacing: .025em; }
 
-        a {
-            color: #555759!important;
-            text-decoration: none;
-            transition: 0.3s;
-            
-            & > span {
-                color: #185876;
-                border-bottom: 1px solid #185876;
-                transition: 0.3s;
-            }
+    .fork-credit a {
+        margin-left: auto;
+        padding: 7px 10px;
+        border: 1px solid rgba(82, 254, 254, 0.35);
+        border-radius: 5px;
+        color: #82f7f7;
+        font-size: 12px;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background .2s ease, border-color .2s ease;
+    }
+    .fork-credit a:hover { background: rgba(82, 254, 254, 0.12); border-color: #52fefe; }
 
-            img {
-                opacity: 0.5;
-                transition: opacity 0.5s;
-                margin-top: -3px;
-            }
+    .original-credits {
+        margin-top: 9px;
+        border: 1px solid rgba(153, 189, 195, 0.12);
+        border-radius: 7px;
+        background: rgba(6, 16, 22, 0.58);
+    }
 
-            &:hover {
-                color: #777a7d!important;
+    summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 15px;
+        color: #92adb2;
+        font-size: 12px;
+        letter-spacing: .02em;
+        cursor: pointer;
+        list-style: none;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary:hover { color: #d4f7f7; }
+    summary:focus-visible, a:focus-visible { outline: 2px solid #52fefe; outline-offset: 2px; }
+    .chevron { width: 8px; height: 8px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: rotate(45deg); transition: transform .2s ease; }
+    details[open] .chevron { transform: rotate(225deg); }
 
-                & > span {
-                    color: #2A9CD0;
-                }
+    .original-content { padding: 2px 15px 14px; border-top: 1px solid rgba(153, 189, 195, 0.1); }
+    .original-content p { margin: 10px 0; color: #8fa5aa; font-size: 12px; }
+    .original-content strong { color: #dcebec; }
+    .original-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+    .original-links a { color: #67bac7; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+    .original-links a:hover { color: #9cfafa; }
 
-                img {
-                    opacity: 1;
-                }
-            }
-
-            &.telegram-link {
-                color: #185876;
-                display: inline-block;
-
-                &:hover {
-                    color: #2A9CD0;
-                    // background: url(/media/images/bg/bg24.gif);
-                    // background-repeat: no-repeat;
-                    // background-size: contain;
-                }
-            }
-
-            &.special-link {
-                color: #941d92;
-                display: inline-block;
-
-                &:hover {
-                    color: #FF07FC;
-                    background: url(/media/images/bg/bg24.gif);
-                    background-repeat: no-repeat;
-                    background-size: contain;
-                }
-            }
-        }
+    @media (max-width: 800px) {
+        .credits { margin-top: 36px; }
     }
 </style>

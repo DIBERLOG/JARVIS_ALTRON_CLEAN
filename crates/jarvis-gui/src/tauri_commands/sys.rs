@@ -2,8 +2,9 @@ use sysinfo::{System, Pid, ProcessRefreshKind, RefreshKind, CpuRefreshKind, Comp
 use peak_alloc::PeakAlloc;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use std::process::Command;
-use std::env;
+use std::time::Duration;
+use serde::Serialize;
+use crate::AppState;
 
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
@@ -20,13 +21,11 @@ static COMPONENTS: Lazy<Mutex<Components>> = Lazy::new(|| {
     Mutex::new(Components::new_with_refreshed_list())
 });
 
-const JARVIS_APP_NAME: &str = "jarvis-app";
-
 /// Find jarvis-app process and return its PID
 fn find_jarvis_app_pid(sys: &System) -> Option<Pid> {
+    let expected = std::env::current_exe().ok()?.with_file_name(if cfg!(windows) { "jarvis-app.exe" } else { "jarvis-app" });
     for (pid, process) in sys.processes() {
-        let name = process.name().to_string_lossy().to_lowercase();
-        if name.contains(JARVIS_APP_NAME) {
+        if process.exe().is_some_and(|path| path == expected) {
             return Some(*pid);
         }
     }
@@ -143,10 +142,52 @@ pub fn run_jarvis_app() -> Result<(), String> {
     if !jarvis_app_path.exists() {
         return Err(format!("jarvis-app not found at: {}", jarvis_app_path.display()));
     }
+    if is_jarvis_app_running() {
+        return Ok(());
+    }
     
     std::process::Command::new(&jarvis_app_path)
         .spawn()
         .map_err(|e| format!("Failed to start jarvis-app: {}", e))?;
     
     Ok(())
+}
+
+#[derive(Serialize)]
+pub struct HealthStatus {
+    pub microphone_ready: bool,
+    pub microphone_name: String,
+    pub neural_ready: bool,
+    pub tts_mode: String,
+    pub tts_ready: bool,
+    pub voicemod_running: bool,
+    pub internet_available: bool,
+}
+
+#[tauri::command]
+pub fn get_health_status(state: tauri::State<'_, AppState>) -> HealthStatus {
+    let mut sys = System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    let assistant_running = find_jarvis_app_pid(&sys).is_some();
+    let voicemod_running = sys.processes().values().any(|process| {
+        process.name().to_string_lossy().eq_ignore_ascii_case("Voicemod.exe")
+    });
+    let devices = jarvis_core::recorder::get_audio_devices();
+    let mic_index = state.settings.read("selected_microphone")
+        .and_then(|value| value.parse::<i32>().ok()).unwrap_or(-1);
+    let microphone_name = if mic_index < 0 { "Системный микрофон".to_string() }
+        else { devices.get(mic_index as usize).cloned().unwrap_or_else(|| "Микрофон не найден".into()) };
+    let microphone_ready = assistant_running && (mic_index < 0 || (mic_index as usize) < devices.len());
+    let (tts_mode, tts_ready) = jarvis_core::tts::mode_status();
+    let internet_available = match reqwest::blocking::Client::builder().timeout(Duration::from_secs(3)).build() {
+        Ok(client) => client.get("https://html.duckduckgo.com/html/").send()
+            .is_ok_and(|response| response.status().is_success())
+            || client.get("https://www.google.com/generate_204").send()
+                .is_ok_and(|response| response.status().is_success()),
+        Err(_) => false,
+    };
+    HealthStatus {
+        microphone_ready, microphone_name, neural_ready: assistant_running,
+        tts_mode, tts_ready, voicemod_running, internet_available,
+    }
 }

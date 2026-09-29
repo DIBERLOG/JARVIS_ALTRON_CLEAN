@@ -1,11 +1,15 @@
 import argparse
+import json
 import sys
 import torch
 import sounddevice as sd
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--text", required=True)
+parser.add_argument("--text")
+parser.add_argument("--server", action="store_true")
 args = parser.parse_args()
+if not args.server and not args.text:
+    parser.error("--text is required unless --server is used")
 
 device_name = next((d["name"] for d in sd.query_devices() if "CABLE Input" in d["name"]), None)
 if not device_name:
@@ -20,6 +24,21 @@ model, _ = torch.hub.load(
     trust_repo=True,
 )
 model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-audio = model.apply_tts(text=args.text, speaker="eugene", sample_rate=48000)
-sd.play(audio.detach().cpu().numpy(), samplerate=48000, device=device_name)
-sd.wait()
+def speak(text: str) -> None:
+    audio = model.apply_tts(text=text, speaker="eugene", sample_rate=48000)
+    sd.play(audio.detach().cpu().numpy(), samplerate=48000, device=device_name)
+    sd.wait()
+
+
+if args.server:
+    print("READY", flush=True)
+    for line in sys.stdin:
+        try:
+            text = json.loads(line)["text"]
+            if text.strip():
+                speak(text)
+            print("OK", flush=True)
+        except Exception as error:
+            print(f"ERROR {error}", flush=True)
+else:
+    speak(args.text)

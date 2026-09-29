@@ -28,6 +28,12 @@ pub fn register(lua: &Lua, jarvis: &Table) -> mlua::Result<()> {
         Ok(true)
     })?;
     audio.set("play", play_fn)?;
+
+    // Play a safe, named recording from resources/sound/command-replies/<language>.
+    let play_command_reply_fn = lua.create_function(|_, command_id: String| {
+        Ok(voices::play_command_reply(&command_id, &crate::i18n::get_language()))
+    })?;
+    audio.set("play_command_reply", play_command_reply_fn)?;
     
     // jarvis.audio.play_ok()
     let play_ok_fn = lua.create_function(|_, ()| {

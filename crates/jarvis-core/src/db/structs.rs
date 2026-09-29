@@ -40,6 +40,10 @@ pub struct Settings {
     pub deepseek_chat_model: String,
     #[serde(default = "default_chat_speak_responses")]
     pub chat_speak_responses: bool,
+    #[serde(default = "default_tts_mode")]
+    pub tts_mode: String,
+    #[serde(default)]
+    pub monitor_self: bool,
     #[serde(default = "default_personality")]
     pub personality: String,
     #[serde(default = "default_voice_dialogue_personality")]
@@ -56,6 +60,7 @@ fn default_chat_provider() -> String { "local".to_string() }
 fn default_local_chat_model() -> String { "qwen3:8b".to_string() }
 fn default_deepseek_chat_model() -> String { "deepseek-flash".to_string() }
 fn default_chat_speak_responses() -> bool { true }
+fn default_tts_mode() -> String { "xtts".to_string() }
 fn default_personality() -> String { "jarvis".to_string() }
 fn default_voice_dialogue_personality() -> String { "jarvis".to_string() }
 
@@ -81,6 +86,8 @@ impl Settings {
             "local_chat_model"          => Some(self.local_chat_model.clone()),
             "deepseek_chat_model"       => Some(self.deepseek_chat_model.clone()),
             "chat_speak_responses"      => Some(self.chat_speak_responses.to_string()),
+            "tts_mode"                  => Some(self.tts_mode.clone()),
+            "monitor_self"              => Some(self.monitor_self.to_string()),
             "assistant_personality"      => Some(self.personality.clone()),
             "voice_dialogue_personality" => Some(self.voice_dialogue_personality.clone()),
             "api_key__picovoice"        => Some(self.api_keys.picovoice.clone()),
@@ -147,6 +154,8 @@ impl Settings {
             "local_chat_model" => self.local_chat_model = val.to_string(),
             "deepseek_chat_model" => self.deepseek_chat_model = val.to_string(),
             "chat_speak_responses" => self.chat_speak_responses = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
+            "tts_mode" => { if val != "silero" && val != "xtts" { return Err("tts mode must be silero or xtts".into()) }; self.tts_mode = val.to_string(); }
+            "monitor_self" => self.monitor_self = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
             "assistant_personality" => { if val != "jarvis" && val != "altron" { return Err("personality must be jarvis or altron".into()) }; self.personality = val.to_string(); }
             "voice_dialogue_personality" => { if val != "jarvis" && val != "altron" { return Err("voice dialogue personality must be jarvis or altron".into()) }; self.voice_dialogue_personality = val.to_string(); }
             "api_key__picovoice" => {
@@ -180,6 +189,8 @@ impl Settings {
             "local_chat_model",
             "deepseek_chat_model",
             "chat_speak_responses",
+            "tts_mode",
+            "monitor_self",
             "assistant_personality",
             "voice_dialogue_personality",
             "api_key__picovoice",
@@ -216,6 +227,8 @@ impl Default for Settings {
             local_chat_model: default_local_chat_model(),
             deepseek_chat_model: default_deepseek_chat_model(),
             chat_speak_responses: default_chat_speak_responses(),
+            tts_mode: default_tts_mode(),
+            monitor_self: false,
             personality: default_personality(),
             voice_dialogue_personality: default_voice_dialogue_personality(),
 
@@ -234,4 +247,33 @@ pub struct ApiKeys {
     pub openai: String,
     #[serde(default)]
     pub deepseek: String,
+}
+
+#[cfg(test)]
+mod tts_mode_tests {
+    use super::Settings;
+
+    #[test]
+    fn old_settings_default_to_xtts() {
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("tts_mode");
+        let settings: Settings = serde_json::from_value(value).unwrap();
+        assert_eq!(settings.get("tts_mode").as_deref(), Some("xtts"));
+    }
+
+    #[test]
+    fn only_supported_tts_modes_can_be_saved() {
+        let mut settings = Settings::default();
+        settings.set("tts_mode", "xtts").unwrap();
+        assert_eq!(settings.get("tts_mode").as_deref(), Some("xtts"));
+        assert!(settings.set("tts_mode", "windows").is_err());
+    }
+
+    #[test]
+    fn microphone_monitor_setting_survives_serialization() {
+        let mut settings = super::Settings::default();
+        settings.set("monitor_self", "true").unwrap();
+        let restored: super::Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.get("monitor_self").as_deref(), Some("true"));
+    }
 }

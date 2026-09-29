@@ -16,6 +16,14 @@ mod tests {
             slots: None,
         }
     }
+
+    #[test]
+    fn weather_script_parses() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../resources/commands/weather/script.lua");
+        let source = fs::read_to_string(path).unwrap();
+        mlua::Lua::new().load(&source).into_function().unwrap();
+    }
     
     #[test]
     fn test_minimal_sandbox() {

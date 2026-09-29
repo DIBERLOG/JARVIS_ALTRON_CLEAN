@@ -476,6 +476,10 @@ body {
     padding: 0.5rem 1.5rem;
 }
 
+.assist-page .search-section {
+    margin-bottom: 52px;
+}
+
 .main-content {
     flex: 1;
     display: flex;
@@ -493,6 +497,25 @@ body {
     justify-content: center;
     gap: 1rem;
     position: relative;
+}
+
+.assist-page .reactor-section {
+    margin-bottom: 60px;
+}
+
+@media (max-width: 800px) {
+    .assist-page .search-section {
+        margin-bottom: 28px;
+    }
+
+    .assist-page .reactor-section {
+        margin-bottom: 34px;
+    }
+
+    .assist-page .reactor-wrapper {
+        transform: scale(0.82);
+        margin: -24px 0 -32px;
+    }
 }
 
 .reactor-wrapper {

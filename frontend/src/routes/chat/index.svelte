@@ -26,9 +26,12 @@
             let requestMessages = messages
             if (webSearch) {
                 const facts = await invoke<string>("chat_search_web", { query: text })
-                requestMessages = [...messages, { role: "system", content: `Свежие данные веб-поиска. Используй только если они отвечают на вопрос, укажи, что это результаты поиска:\n${facts}` }]
+                requestMessages = [...messages.slice(0, -1), {
+                    role: "user",
+                    content: `${text}\n\nДанные веб-поиска (непроверенные выдержки; используй только по теме и пометь источник как результаты поиска):\n${facts}`
+                }]
             }
-            const reply = await invoke<{content:string}>("chat_send", { messages: requestMessages }); messages = [...messages, { role: "assistant", content: reply.content }]
+            const reply = await invoke<{content:string}>("chat_send", { clientMessages: requestMessages }); messages = [...messages, { role: "assistant", content: reply.content }]
         }
         catch (e) { error = String(e) } finally { loading = false }
     }
@@ -40,7 +43,7 @@
         <div class="persona-switch" aria-label="Личность ассистента"><button class:active={config.personality === 'jarvis'} on:click={() => config.personality = 'jarvis'}><b>JARVIS</b><span>точный, спокойный</span></button><button class:active={config.personality === 'altron'} on:click={() => config.personality = 'altron'}><b>ALTRON</b><span>холодный, прямой</span></button></div>
         <label>Источник <select bind:value={config.provider}><option value="local">Локально — Ollama</option><option value="deepseek">DeepSeek API</option></select></label>
         {#if config.provider === "local"}<label>Модель <input bind:value={config.local_model} /></label><small>На компьютере уже есть <b>qwen3:8b</b> (≈5.2 ГБ), поэтому она выбрана по умолчанию. Ollama работает локально и не требует API-ключа.</small>{:else}<label>Модель DeepSeek <input bind:value={config.deepseek_model} /></label><label>API-ключ <input type="password" bind:value={key} placeholder={config.deepseek_configured ? "Ключ сохранён — введи новый для замены" : "sk-..."} /></label>{/if}
-        <label class="voice-toggle"><input type="checkbox" bind:checked={config.speak_responses} /> Озвучивать ответы Jarvis</label><button on:click={save}>Сохранить настройки</button>
+        <label class="voice-toggle"><input type="checkbox" bind:checked={config.speak_responses} /><span class="voice-check" aria-hidden="true"></span><span class="voice-copy"><b>ГОЛОСОВОЙ ОТВЕТ</b><small>Озвучивать ответы ассистента</small></span></label><button on:click={save}>Сохранить настройки</button>
     </div>
     <div class="dialog">{#each visible as message}<article class:me={message.role === "user"}><b>{message.role === "user" ? "ТЫ" : "JARVIS"}</b><p>{message.content}</p></article>{/each}{#if loading}<article><b>JARVIS</b><p>Думаю…</p></article>{/if}{#if error}<p class="error">{error}</p>{/if}</div>
     <form on:submit|preventDefault={send}><textarea bind:value={prompt} placeholder="Напиши вопрос ассистенту…" disabled={loading}></textarea><label class="web-search"><input type="checkbox" bind:checked={webSearch} /><span class="pulse"></span><span><b>WEB INTEL</b><small>Искать в интернете перед ответом</small></span></label><button disabled={loading}>Отправить</button></form>
@@ -48,4 +51,14 @@
 
 <style lang="scss">
 .chat-shell{max-width:940px;margin:2.5rem auto;color:#eaf8fa;padding:0 1.4rem}.chat-shell header p{color:#52fefe;letter-spacing:.16em;font-size:.75rem}.chat-shell h1{margin:.25rem 0}.chat-shell header span,small{color:#90a7ad}.settings,.dialog,form{background:#0d1417;border:1px solid #1c353a;border-radius:10px;padding:1rem;margin-top:1rem}.settings{display:grid;gap:.7rem}.settings label{display:grid;gap:.3rem;color:#b9d2d8}.persona-switch{display:grid;grid-template-columns:1fr 1fr;gap:.55rem}.persona-switch button{width:100%;text-align:left;background:#102126;border:1px solid #27454c;color:#b8d4d9}.persona-switch button span{display:block;font-size:.72rem;font-weight:400;opacity:.7;margin-top:.2rem}.persona-switch button.active{background:linear-gradient(135deg,#0a6e78,#132c37);border-color:#52fefe;color:#fff}.persona-switch button:last-child.active{background:linear-gradient(135deg,#7b2318,#2a1113);border-color:#ff735a}input,select,textarea{background:#071012;border:1px solid #315057;border-radius:6px;color:#ecffff;padding:.65rem;font:inherit}button{background:#16a8ae;color:#041011;border:0;border-radius:6px;padding:.65rem 1rem;font-weight:700;cursor:pointer;width:max-content}.dialog{min-height:260px;max-height:430px;overflow:auto}article{padding:.65rem .8rem;margin:.6rem 0;background:#101d20;border-left:3px solid #52fefe;border-radius:4px}article.me{border-left-color:#9b63ff}article p{white-space:pre-wrap;margin:.3rem 0 0}form{display:grid;gap:.7rem}textarea{min-height:90px;resize:vertical}.web-search{display:flex!important;align-items:center;gap:.65rem;padding:.65rem .8rem;border:1px solid #27535a;border-radius:7px;background:linear-gradient(90deg,#0b2025,#0d1417);cursor:pointer}.web-search input{accent-color:#52fefe}.web-search b{color:#52fefe;letter-spacing:.1em;font-size:.73rem}.web-search small{display:block}.pulse{height:.5rem;width:.5rem;border-radius:99px;background:#52fefe;box-shadow:0 0 12px #52fefe}.error{color:#ff8e8e}code{color:#52fefe}
+
+.settings .voice-toggle{display:flex;align-items:center;gap:.75rem;padding:.7rem .85rem;border:1px solid #27535a;border-radius:7px;background:linear-gradient(90deg,#0b2025,#0d1417);cursor:pointer}
+.voice-toggle input{position:absolute;width:1px;height:1px;opacity:0;padding:0}
+.voice-check{display:grid;place-items:center;flex:none;width:20px;height:20px;border:1px solid #4e8088;border-radius:5px;background:#071418;color:#051517;font-size:14px;font-weight:800;line-height:1;transition:background .2s,border-color .2s,box-shadow .2s}
+.voice-toggle input:checked + .voice-check{background:#52fefe;border-color:#52fefe;box-shadow:0 0 12px rgba(82,254,254,.3)}
+.voice-toggle input:checked + .voice-check::after{content:'✓'}
+.voice-toggle input:focus-visible + .voice-check{outline:2px solid #fff;outline-offset:3px}
+.voice-copy{display:flex;flex-direction:column;gap:.15rem;text-align:left}
+.voice-copy b{color:#52fefe;font-size:.73rem;letter-spacing:.1em}
+.voice-copy small{font-size:.78rem}
 </style>

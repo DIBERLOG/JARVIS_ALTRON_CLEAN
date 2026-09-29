@@ -342,18 +342,26 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
-    if text.contains("давай пообщаемся") || text.contains("давай поговорим") {
+    let language = i18n::get_language();
+    if text.contains("давай пообщаемся") || text.contains("давай поговорим") || text.contains("включи диалоговый режим") {
         DIALOGUE_MODE.store(true, Ordering::SeqCst);
-        tts::speak("Режим диалога активирован. Скажите, сэр.");
+        if !voices::play_command_reply("dialogue_start", &language) {
+            tts::speak("Режим диалога активирован. Скажите, сэр.");
+        }
         return true;
     }
-    if DIALOGUE_MODE.load(Ordering::SeqCst) {
-        if text.contains("закончи разговор") || text.contains("закончим разговор") || text.contains("хватит общаться") {
-            DIALOGUE_MODE.store(false, Ordering::SeqCst); tts::speak("Диалоговый режим отключён."); return false;
+    if DIALOGUE_MODE.load(Ordering::SeqCst)
+        && (text.contains("закончи разговор") || text.contains("закончим разговор") || text.contains("хватит общаться") || text.contains("выключи диалоговый режим")) {
+        DIALOGUE_MODE.store(false, Ordering::SeqCst);
+        if !voices::play_command_reply("dialogue_stop", &language) {
+            tts::speak("Диалоговый режим отключён.");
         }
-        match jarvis_core::chat::ask(text) { Ok(answer) => { tts::speak(&answer); return true; }, Err(error) => { warn!("Dialogue chat failed: {}", error); tts::speak("Не удалось получить ответ."); return true; } }
+        return false;
     }
-    let commands_list = match COMMANDS_LIST.get() {
+    // Re-read command manifests so added phrases and edited packs take effect
+    // without a restart. The startup snapshot remains a safe fallback.
+    let current_commands = commands::parse_commands().ok();
+    let commands_list = match current_commands.as_deref().or_else(|| COMMANDS_LIST.get().map(Vec::as_slice)) {
         Some(c) => c,
         None => {
             ipc::send(IpcEvent::Error { message: "Commands not loaded".to_string() });
@@ -362,15 +370,26 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
         }
     };
     
-    let cmd_result = if let Some((intent_id, confidence)) = 
-        rt.block_on(intent::classify(text)) 
-    {
-        info!("Intent recognized: {} (confidence: {:.2})", intent_id, confidence);
-        intent::get_command_by_intent(commands_list, &intent_id)
-    } else {
-        info!("Intent not recognized, trying levenshtein fallback...");
-        commands::fetch_command(text, commands_list)
-    };
+    let exact_command = commands::fetch_exact_command(text, commands_list);
+    if DIALOGUE_MODE.load(Ordering::SeqCst) && exact_command.is_none() {
+        match jarvis_core::chat::ask(text) {
+            Ok(answer) => { tts::speak(&answer); return true; }
+            Err(error) => {
+                warn!("Dialogue chat failed: {}", error);
+                tts::speak("Не удалось получить ответ.");
+                return true;
+            }
+        }
+    }
+    let cmd_result = exact_command.or_else(|| {
+        if let Some((intent_id, confidence)) = rt.block_on(intent::classify(text)) {
+            info!("Intent recognized: {} (confidence: {:.2})", intent_id, confidence);
+            intent::get_command_by_intent(commands_list, &intent_id)
+        } else {
+            info!("Intent not recognized, trying phrase similarity...");
+            commands::fetch_command(text, commands_list)
+        }
+    });
     
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);
@@ -386,11 +405,19 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
             None
         };
 
+        // Dynamic Lua responses still speak their values after the recorded introduction.
+        // Restart actions must wait for their warning clip before terminating the process.
+        let play_before = matches!(cmd_config.id.as_str(),
+            "counter" | "set_city" | "test_greet_name" | "jarvis_restart" | "computer_restart");
+        let played_before = play_before && voices::play_command_reply(&cmd_config.id, &language);
+
         match commands::execute_command(&cmd_path, &cmd_config, Some(&text), extracted_slots.as_ref()) {
             Ok(chain) => {
                 info!("Command executed successfully");
-                // voices::play_ok();
-                voices::play_random_from(cmd_config.get_sounds(&i18n::get_language()).as_slice());
+                if cmd_config.id != "weather" && !played_before
+                    && !voices::play_command_reply(&cmd_config.id, &language) {
+                    voices::play_random_from(cmd_config.get_sounds(&language).as_slice());
+                }
                 ipc::send(IpcEvent::CommandExecuted {
                     id: cmd_config.id.clone(),
                     success: true,

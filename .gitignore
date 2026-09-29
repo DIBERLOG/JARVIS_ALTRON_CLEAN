@@ -60,3 +60,12 @@ tree.txt
 /tools/voice_training/smoke_output/
 /tools/voice_training/*.log
 /tools/voice_training/*test.wav
+/tools/voice_training/dataset_xtts_pilot*/
+/tools/voice_training/xtts_pilot_assets/
+/tools/voice_training/xtts_pilot_output/
+/tools/voice_training/jarvis_xtts_pilot_*.wav
+**/__pycache__/
+/tools/voice_training/dataset_current/
+/tools/voice_training/*.wav
+/tools/voice_training/transcripts_*.jsonl
+/tools/voice_training/transcripts_review.csv

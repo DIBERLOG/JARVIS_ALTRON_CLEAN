@@ -60,3 +60,23 @@ pub fn play_sound(filename: &PathBuf) {
         }
     }
 }
+
+pub fn play_sound_blocking(filename: &PathBuf) -> bool {
+    let sound_data = match StaticSoundData::from_file(filename) {
+        Ok(data) => data,
+        Err(err) => {
+            warn!("Cannot load command reply: {} (err: {})", filename.display(), err);
+            return false;
+        }
+    };
+    let duration = sound_data.duration();
+    let Some(manager) = MANAGER.get() else { return false; };
+    let Ok(mut audio_manager) = manager.lock() else { return false; };
+    if let Err(err) = audio_manager.play(sound_data) {
+        warn!("Failed to play command reply: {}", err);
+        return false;
+    }
+    drop(audio_manager);
+    std::thread::sleep(duration);
+    true
+}

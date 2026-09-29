@@ -25,7 +25,7 @@ type = "lua"
 description = "Сохранить город для команды погоды"
 script = "set_city.lua"
 sandbox = "standard"
-timeout = 5000
+timeout = 60000
 
 [commands.phrases]
 ru = ["установи город {city}", "измени город на {city}", "город {city}"]

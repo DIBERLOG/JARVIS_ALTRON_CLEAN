@@ -66,7 +66,7 @@
     </div>
 
     <div class="reactor-section">
-        <div class="reactor-wrapper" class:dimmed={!processRunning}>
+        <div class="reactor-wrapper">
             <ArcReactor />
         </div>
         

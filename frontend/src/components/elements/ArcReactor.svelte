@@ -9,7 +9,7 @@
     }[$jarvisState] || 'disconnected'
 </script>
 
-<div id="arc-reactor" class="reactor-container {stateClass} arc-white">
+<div id="arc-reactor" class="reactor-container {stateClass} arc-cyan">
     <div class="reactor-container-inner circle abs-center">
         <ul class="marks">
             {#each Array(60) as _, i}
@@ -419,8 +419,7 @@
     // [ DISCONNECTED ]
     .reactor-container.disconnected {
         transform: scale(0.85);
-        opacity: 0.4;
-        filter: grayscale(0.7) brightness(0.6);
+        opacity: 0.65;
         
         .coil-container { animation-duration: 20s; }
         .e7 { opacity: 0.3; }

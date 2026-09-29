@@ -33,24 +33,50 @@ pub fn chat_search_web(query: String) -> Result<String, String> {
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(20)).build().map_err(|e| e.to_string())?;
     let url = reqwest::Url::parse_with_params("https://html.duckduckgo.com/html/", &[("q", query)])
         .map_err(|e| format!("Некорректный запрос поиска: {e}"))?;
-    let html = client.get(url).header("User-Agent", "Mozilla/5.0 Jarvis/1.0")
+    let response = client.get(url).header("User-Agent", "Mozilla/5.0 Jarvis/1.0")
         .send().map_err(|e| format!("Поиск недоступен: {e}"))?
+        .error_for_status().map_err(|e| format!("Поиск вернул ошибку: {e}"))?;
+    let html = response
         .text().map_err(|e| format!("Не удалось прочитать выдачу: {e}"))?;
+    let facts = extract_search_snippets(&html);
+    if facts.is_empty() { return Err("Поиск не вернул сниппеты. Попробуй другой запрос или выключи WEB INTEL.".into()); }
+    Ok(facts.join("\n\n"))
+}
+
+fn extract_search_snippets(html: &str) -> Vec<String> {
     let mut facts = Vec::new();
-    let mut rest = html.as_str();
+    let mut rest = html;
     while facts.len() < 5 {
         let Some(marker) = rest.find("result__snippet") else { break; };
         rest = &rest[marker..];
         let Some(start) = rest.find('>') else { break; };
         rest = &rest[start + 1..];
-        let Some(end) = rest.find("</") else { break; };
-        let snippet = rest[..end].replace("<b>", "").replace("</b>", "").replace("&amp;", "&").replace("&#x27;", "'");
-        let snippet = snippet.split_whitespace().collect::<Vec<_>>().join(" ");
-        if snippet.len() > 20 { facts.push(snippet); }
-        rest = &rest[end + 2..];
+        let Some(end) = rest.find("</a>") else { break; };
+        let mut in_tag = false;
+        let plain: String = rest[..end].chars().filter(|ch| match ch {
+            '<' => { in_tag = true; false },
+            '>' => { in_tag = false; false },
+            _ => !in_tag,
+        }).collect();
+        let plain = plain.replace("&amp;", "&").replace("&quot;", "\"")
+            .replace("&#x27;", "'").replace("&#39;", "'")
+            .replace("&lt;", "<").replace("&gt;", ">");
+        let snippet = plain.split_whitespace().collect::<Vec<_>>().join(" ");
+        if snippet.chars().count() > 20 { facts.push(snippet); }
+        rest = &rest[end + "</a>".len()..];
     }
-    if facts.is_empty() { return Err("Поиск не вернул сниппеты. Попробуй другой запрос или выключи WEB INTEL.".into()); }
-    Ok(facts.join("\n\n"))
+    facts
+}
+
+#[cfg(test)]
+mod search_tests {
+    use super::extract_search_snippets;
+
+    #[test]
+    fn nested_markup_does_not_truncate_search_result() {
+        let html = r#"<a class="result__snippet" href="/test"><b>Погода</b> в Москве: сегодня тепло &amp; сухо.</a>"#;
+        assert_eq!(extract_search_snippets(html), vec!["Погода в Москве: сегодня тепло & сухо."]);
+    }
 }
 
 fn speech_text(text: &str) -> String {

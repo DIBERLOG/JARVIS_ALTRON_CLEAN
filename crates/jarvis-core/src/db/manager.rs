@@ -2,7 +2,7 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use super::structs::Settings;
-use super::save_settings;
+use super::{latest_settings, update_settings};
 
 // centralized settings manager.
 // wraps Arc<RwLock<Settings>> and handles locking + auto-save
@@ -26,36 +26,29 @@ impl SettingsManager {
 
     // read a setting by key
     pub fn read(&self, key: &str) -> Option<String> {
-        self.inner.read().get(key)
+        let mut settings = self.inner.write();
+        if let Some(latest) = latest_settings() {
+            *settings = latest;
+        }
+        settings.get(key)
     }
 
     // write a setting by key, auto-saves to disk
     pub fn write(&self, key: &str, val: &str) -> Result<(), String> {
-        let snapshot = {
-            let mut settings = self.inner.write();
-            settings.set(key, val)?;
-            settings.clone()
-        };
-
-        save_settings(&snapshot)
-            .map_err(|e| format!("failed to save settings: {}", e))?;
-
+        let mut settings = self.inner.write();
+        *settings = update_settings(&settings, |latest| latest.set(key, val))?;
         Ok(())
     }
 
     // write multiple settings at once, single save
     pub fn write_many(&self, pairs: &[(&str, &str)]) -> Result<(), String> {
-        let snapshot = {
-            let mut settings = self.inner.write();
+        let mut settings = self.inner.write();
+        *settings = update_settings(&settings, |latest| {
             for (key, val) in pairs {
-                settings.set(key, val)?;
+                latest.set(key, val)?;
             }
-            settings.clone()
-        };
-
-        save_settings(&snapshot)
-            .map_err(|e| format!("failed to save settings: {}", e))?;
-
+            Ok(())
+        })?;
         Ok(())
     }
 

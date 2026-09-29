@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use rand::prelude::*;
 use once_cell::sync::OnceCell;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 // use chrono::Timelike;
 
 use crate::{DB, SOUND_DIR, audio, config, time};
@@ -12,6 +12,7 @@ pub use structs::*;
 
 static VOICES: OnceCell<Vec<structs::VoiceConfig>> = OnceCell::new();
 static CURRENT_VOICE_ID: OnceCell<RwLock<String>> = OnceCell::new();
+static LAST_JOKE_REPLY: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 pub fn init(default_voice: &str, language: &str) -> Result<(), String> {
     let voices = scan_voices()?;
@@ -150,21 +151,22 @@ fn find_sound_file(voice_path: &Path, lang: &str, sound_name: &str) -> Option<Pa
     None
 }
 
-fn play_random_from_list(voice_path: &Path, lang: &str, sounds: &[String]) {
+fn play_random_from_list(voice_path: &Path, lang: &str, sounds: &[String]) -> bool {
     if sounds.is_empty() {
-        return;
+        return false;
     }
     
-    let sound_name = sounds.choose(&mut rand::thread_rng()).unwrap();
-    
-    match find_sound_file(voice_path, lang, sound_name) {
-        Some(path) => {
-            debug!("Playing: {:?}", path);
-            audio::play_sound(&path);
-        }
-        None => {
-            warn!("Sound not found: {} (lang: {})", sound_name, lang);
-        }
+    let available: Vec<PathBuf> = sounds.iter()
+        .filter_map(|name| find_sound_file(voice_path, lang, name))
+        .collect();
+
+    if let Some(path) = available.choose(&mut rand::thread_rng()) {
+        debug!("Playing: {:?}", path);
+        audio::play_sound(path);
+        true
+    } else {
+        warn!("No available sounds for {:?} (lang: {})", sounds, lang);
+        false
     }
 }
 
@@ -223,7 +225,74 @@ pub fn play_random_from(sounds: &[String]) {
         }
     };
     
-    play_random_from_list(&voice.path, &get_current_language(), sounds);
+    let lang = get_current_language();
+    if play_random_from_list(&voice.path, &lang, sounds) {
+        return;
+    }
+
+    // Some voice packs have fewer reactions (for example, no joke clips).
+    // Use the pack with the most matching clips when the selected pack has none.
+    if let Some(fallback) = list_voices().iter()
+        .filter(|candidate| candidate.voice.id != voice.voice.id)
+        .max_by_key(|candidate| sounds.iter()
+            .filter(|name| find_sound_file(&candidate.path, &lang, name).is_some())
+            .count()) {
+        play_random_from_list(&fallback.path, &lang, sounds);
+    }
+}
+
+/// Command replies are independent of the selected legacy voice pack.
+/// Missing clips fall back to the command's configured sounds.
+pub fn play_command_reply(command_id: &str, language: &str) -> bool {
+    if !command_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        return false;
+    }
+    let reply_dir = SOUND_DIR.join("command-replies").join(language);
+    if command_id == "jarvis_joke" {
+        let mut jokes: Vec<PathBuf> = fs::read_dir(&reply_dir).ok().into_iter().flatten()
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().is_some_and(|ext| ext == "mp3"))
+            .filter(|path| path.file_stem().and_then(|stem| stem.to_str()).is_some_and(|stem| {
+                stem == "jarvis_joke" || stem.strip_prefix("jarvis_joke_")
+                    .is_some_and(|number| number.parse::<u32>().is_ok())
+            }))
+            .collect();
+        jokes.sort();
+        let selected = pick_without_repeat(&jokes, LAST_JOKE_REPLY.lock().as_ref());
+        if let Some(path) = selected {
+            if audio::play_sound_blocking(&path) {
+                *LAST_JOKE_REPLY.lock() = Some(path);
+                return true;
+            }
+        }
+        return false;
+    }
+    let path = reply_dir.join(format!("{command_id}.mp3"));
+    if !path.is_file() { return false; }
+    audio::play_sound_blocking(&path)
+}
+
+fn pick_without_repeat(paths: &[PathBuf], previous: Option<&PathBuf>) -> Option<PathBuf> {
+    let choices: Vec<&PathBuf> = paths.iter()
+        .filter(|path| paths.len() == 1 || Some(*path) != previous)
+        .collect();
+    choices.choose(&mut rand::thread_rng()).map(|path| (*path).clone())
+}
+
+#[cfg(test)]
+mod command_reply_tests {
+    use super::pick_without_repeat;
+    use std::path::PathBuf;
+
+    #[test]
+    fn joke_does_not_repeat_when_alternatives_exist() {
+        let paths = vec![PathBuf::from("one.mp3"), PathBuf::from("two.mp3"), PathBuf::from("three.mp3")];
+        for previous in &paths {
+            for _ in 0..20 {
+                assert_ne!(pick_without_repeat(&paths, Some(previous)).as_ref(), Some(previous));
+            }
+        }
+    }
 }
 
 // Play a preview sound for a specific voice

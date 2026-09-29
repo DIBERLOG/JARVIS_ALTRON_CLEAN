@@ -2,13 +2,15 @@ use jarvis_core::slots;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::process::{Child, Command, Stdio};
+use std::time::Duration;
 
 // include core
 use jarvis_core::{
     audio, audio_processing, commands, config, db, listener, recorder, stt, intent,
     ipc::{self, IpcAction},
     i18n, voices, models,
-    APP_CONFIG_DIR, APP_LOG_DIR, COMMANDS_LIST, DB,
+    APP_CONFIG_DIR, APP_LOG_DIR, APP_DIR, COMMANDS_LIST, DB,
 };
 
 // include log
@@ -40,6 +42,7 @@ fn main() -> Result<(), String> {
     // set global DB (for core modules that read settings at init time)
     DB.set(settings.arc().clone())
             .expect("DB already initialized");
+    jarvis_core::tts::prewarm_silero();
 
     // init voices
     let voice_id = settings.lock().voice.clone();
@@ -127,8 +130,10 @@ fn main() -> Result<(), String> {
                 SHOULD_STOP.store(true, Ordering::SeqCst);
             }
             IpcAction::ReloadCommands => {
-                info!("Received reload commands request");
-                // TODO: implement reload
+                match commands::parse_commands() {
+                    Ok(packs) => info!("Reloaded {} command packs; new phrases apply on the next command", packs.len()),
+                    Err(error) => warn!("Could not reload commands: {error}"),
+                }
             }
             IpcAction::SetMuted { muted } => {
                 info!("Received mute request: {}", muted);
@@ -159,6 +164,10 @@ fn main() -> Result<(), String> {
         let _ = app::start(text_cmd_rx, &app_rt);
     });
 
+    // This sidetone is separate from Voicemod's monitoring button. The
+    // physical microphone is never mixed into Jarvis's VB-CABLE output.
+    std::thread::spawn(monitor_self_loop);
+
     // The tray shell is intentionally disabled on this Windows build: its menu
     // dependency imports TaskDialogIndirect, which is unavailable on this PC.
     // The GUI remains the control surface and the assistant threads stay alive.
@@ -171,4 +180,37 @@ fn main() -> Result<(), String> {
 
 pub fn should_stop() -> bool {
     SHOULD_STOP.load(Ordering::SeqCst)
+}
+
+fn monitor_self_loop() {
+    let python = APP_DIR.parent().and_then(|target| target.parent())
+        .map(|root| root.join("tools/voice_training/.venv/Scripts/pythonw.exe"));
+    let script = APP_DIR.join("resources/tts/MicMonitor.py");
+    let mut child: Option<Child> = None;
+    while !should_stop() {
+        let enabled = db::latest_settings().is_some_and(|settings| settings.monitor_self);
+        if let Some(process) = child.as_mut() {
+            if !enabled || process.try_wait().ok().flatten().is_some() {
+                let _ = process.kill();
+                let _ = process.wait();
+                child = None;
+            }
+        }
+        if enabled && child.is_none() {
+            if let Some(python) = python.as_ref().filter(|path| path.is_file()) {
+                if script.is_file() {
+                    match Command::new(python).arg(&script)
+                        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn() {
+                        Ok(process) => child = Some(process),
+                        Err(error) => warn!("Microphone monitoring failed: {error}"),
+                    }
+                }
+            }
+        }
+        std::thread::sleep(Duration::from_secs(2));
+    }
+    if let Some(mut process) = child {
+        let _ = process.kill();
+        let _ = process.wait();
+    }
 }

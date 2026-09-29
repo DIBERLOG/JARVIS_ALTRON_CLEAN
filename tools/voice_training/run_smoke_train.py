@@ -32,7 +32,7 @@ from TTS.utils.audio import AudioProcessor
 
 
 ROOT = Path(__file__).resolve().parent
-DATASET = ROOT / "dataset"
+DATASET = Path(os.environ.get("JARVIS_TRAIN_DATASET", str(ROOT / "dataset_current")))
 OUTPUT = ROOT / "smoke_output"
 
 
@@ -65,7 +65,7 @@ def main() -> None:
         language="ru",
     )
     config = VitsConfig(
-        run_name="jarvis_ru_smoke_retry3",
+        run_name=os.environ.get("JARVIS_TRAIN_RUN", "jarvis_ru_current" if DATASET.name == "dataset_current" else "jarvis_ru_smoke_retry3"),
         output_path=str(OUTPUT),
         datasets=[dataset_config],
         characters=characters,
@@ -78,7 +78,7 @@ def main() -> None:
         print_step=1,
         save_step=1,
         save_n_checkpoints=1,
-        epochs=1,
+        epochs=int(os.environ.get("JARVIS_TRAIN_EPOCHS", "1")),
         mixed_precision=True,
         use_grad_scaler=True,
         cudnn_benchmark=True,
@@ -94,7 +94,7 @@ def main() -> None:
 
     model = Vits(config, ap, tokenizer, speaker_manager=None)
     trainer = Trainer(
-        TrainerArgs(),
+        TrainerArgs(restore_path=os.environ.get("JARVIS_TRAIN_RESTORE", "")),
         config,
         output_path=str(OUTPUT),
         model=model,

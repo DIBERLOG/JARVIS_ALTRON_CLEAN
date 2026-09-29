@@ -23,6 +23,7 @@ fn main() {
 
     // init settings
     let manager = db::init();
+    jarvis_core::tts::prewarm_silero();
 
     // init i18n
     i18n::init(&manager.lock().language);
@@ -55,6 +56,7 @@ fn main() {
             // db
             tauri_commands::db_read,
             tauri_commands::db_write,
+            tauri_commands::db_write_many,
 
             // etc
             tauri_commands::get_app_version,
@@ -75,6 +77,7 @@ fn main() {
             tauri_commands::get_cpu_temp,
             tauri_commands::get_cpu_usage,
             tauri_commands::get_jarvis_app_stats,
+            tauri_commands::get_health_status,
             tauri_commands::is_jarvis_app_running,
             tauri_commands::run_jarvis_app,
 
