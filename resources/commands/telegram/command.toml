@@ -1,0 +1,8 @@
+[[commands]]
+id = "telegram_open"
+type = "lua"
+script = "script.lua"
+sandbox = "standard"
+timeout = 5000
+phrases.ru = ["открой телеграм", "открой телеграмм", "запусти телеграм", "запусти телеграмм"]
+phrases.en = ["open telegram", "launch telegram"]

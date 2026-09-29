@@ -170,6 +170,15 @@ fn play_random_from_list(voice_path: &Path, lang: &str, sounds: &[String]) -> bo
     }
 }
 
+fn greeting_sounds(reactions: &structs::VoiceReactions, period: time::TimeOfDay) -> &[String] {
+    match period {
+        time::TimeOfDay::Morning => &reactions.greet_morning,
+        time::TimeOfDay::Day => &reactions.greet_day,
+        time::TimeOfDay::Evening => &reactions.greet_evening,
+        time::TimeOfDay::Night => &reactions.greet_night,
+    }
+}
+
 pub fn play(reaction: structs::Reaction) {
     let voice = match get_current_voice() {
         Some(v) => v,
@@ -191,19 +200,23 @@ pub fn play(reaction: structs::Reaction) {
 
     let sounds = match reaction {
         structs::Reaction::Greet => {
-            // try time-specific first
-            let time_specific = match time::TimeOfDay::now() {
-                time::TimeOfDay::Morning => &reactions.greet_morning,
-                time::TimeOfDay::Day => &reactions.greet_day,
-                time::TimeOfDay::Evening => &reactions.greet_evening,
-                time::TimeOfDay::Night => &reactions.greet_night,
-            };
-
-            if time_specific.is_empty() {
-                &reactions.greet
-            } else {
-                time_specific
+            let period = time::TimeOfDay::now();
+            if play_random_from_list(&voice.path, &lang, greeting_sounds(reactions, period)) {
+                return;
             }
+
+            // Older voice packs have only a generic startup clip. Use a recorded
+            // time-aware greeting from the remaster pack before that generic clip.
+            if voice.voice.id != "jarvis-remaster" {
+                if let Some(remaster) = get_voice("jarvis-remaster") {
+                    if let Some(remaster_reactions) = remaster.reactions.get(&lang) {
+                        if play_random_from_list(&remaster.path, &lang, greeting_sounds(remaster_reactions, period)) {
+                            return;
+                        }
+                    }
+                }
+            }
+            &reactions.greet
         }
         structs::Reaction::Reply => &reactions.reply,
         structs::Reaction::Ok => &reactions.ok,

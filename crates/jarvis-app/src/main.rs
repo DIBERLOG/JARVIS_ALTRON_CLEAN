@@ -23,6 +23,11 @@ mod app;
 
 
 static SHOULD_STOP: AtomicBool = AtomicBool::new(false);
+static MICROPHONE_MUTED: AtomicBool = AtomicBool::new(false);
+
+fn microphone_muted() -> bool {
+    MICROPHONE_MUTED.load(Ordering::SeqCst)
+}
 
 fn main() -> Result<(), String> {
     // initialize directories
@@ -38,6 +43,7 @@ fn main() -> Result<(), String> {
 
     // initialize settings
     let settings = db::init();
+    MICROPHONE_MUTED.store(settings.lock().microphone_muted, Ordering::SeqCst);
 
     // set global DB (for core modules that read settings at init time)
     DB.set(settings.arc().clone())
@@ -123,6 +129,7 @@ fn main() -> Result<(), String> {
     // channel for text commands (manually written in the GUI)
     let (text_cmd_tx, text_cmd_rx) = mpsc::channel::<String>();
 
+    let ipc_settings = settings.clone();
     ipc::set_action_handler(move |action| {
         match action {
             IpcAction::Stop => {
@@ -137,7 +144,13 @@ fn main() -> Result<(), String> {
             }
             IpcAction::SetMuted { muted } => {
                 info!("Received mute request: {}", muted);
-                // TODO: implement mute
+                MICROPHONE_MUTED.store(muted, Ordering::SeqCst);
+                if let Err(error) = ipc_settings.write("microphone_muted", if muted { "true" } else { "false" }) {
+                    warn!("Could not save microphone state: {error}");
+                }
+            }
+            IpcAction::GetMuted => {
+                ipc::send(jarvis_core::ipc::IpcEvent::MicrophoneMuted { muted: microphone_muted() });
             }
             IpcAction::TextCommand { text } => {
                 info!("Received text command: {}", text);
@@ -188,7 +201,8 @@ fn monitor_self_loop() {
     let script = APP_DIR.join("resources/tts/MicMonitor.py");
     let mut child: Option<Child> = None;
     while !should_stop() {
-        let enabled = db::latest_settings().is_some_and(|settings| settings.monitor_self);
+        let enabled = !microphone_muted()
+            && db::latest_settings().is_some_and(|settings| settings.monitor_self);
         if let Some(process) = child.as_mut() {
             if !enabled || process.try_wait().ok().flatten().is_some() {
                 let _ = process.kill();
@@ -207,7 +221,7 @@ fn monitor_self_loop() {
                 }
             }
         }
-        std::thread::sleep(Duration::from_secs(2));
+        std::thread::sleep(Duration::from_millis(500));
     }
     if let Some(mut process) = child {
         let _ = process.kill();

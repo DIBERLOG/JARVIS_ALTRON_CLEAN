@@ -4,6 +4,7 @@
     import routes from "../.routify/routes.default.js"
     import { SvelteUIProvider } from "@svelteuidev/core"
     import Events from "./Events.svelte"
+    import JarvisNotification from "./components/JarvisNotification.svelte"
 
     import {
         loadVoiceSetting,
@@ -41,3 +42,4 @@
 </SvelteUIProvider>
 
 <Events />
+<JarvisNotification />

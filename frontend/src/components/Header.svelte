@@ -3,6 +3,7 @@
     import { invoke } from "@tauri-apps/api/core"
     import { onMount } from "svelte"
     import { currentLanguage, setLanguage, translations, translate } from "@/stores"
+    import { ipcConnected, microphoneMuted, microphoneMuteKnown, setMicrophoneMuted } from "@/lib/ipc"
     
     let appVersion = ""
     let commandsCount = 0
@@ -16,19 +17,25 @@
         { code: "ua", label: "UA", flag: "🇺🇦", name: "Українська" },
     ]
 
+    async function refreshCommandsCount() {
+        try {
+            commandsCount = await invoke<number>("get_commands_count")
+        } catch (error) {
+            console.error("Не удалось обновить количество команд", error)
+        }
+    }
+
     onMount(async () => {
         try {
             appVersion = await invoke<string>("get_app_version")
-            commandsCount = await invoke<number>("get_commands_count")
+            await refreshCommandsCount()
 
             // load saved language
             const savedLang = await invoke<string>("db_read", { key: "language" })
             if (savedLang) {
                 selectedLang = savedLang
             }
-        } catch {
-            commandsCount = 0
-        }
+        } catch (error) { console.error("Не удалось загрузить заголовок", error) }
     })
 
     async function selectLanguage(code: string) {
@@ -51,7 +58,7 @@
     $: t = (key: string) => translate($translations, key)
 </script>
 
-<svelte:window on:click={closeLangDropdown} />
+<svelte:window on:click={closeLangDropdown} on:focus={refreshCommandsCount} />
 
 <header id="header" class="header">
     <div class="header-left">
@@ -67,6 +74,9 @@
     </div>
     
     <div class="header-right">
+        <button class="mic-toggle" class:muted={$microphoneMuted} on:click={() => setMicrophoneMuted(!$microphoneMuted)} disabled={!$ipcConnected || !$microphoneMuteKnown} aria-label={$microphoneMuted ? "Включить глобальное прослушивание микрофона" : "Остановить глобальное прослушивание микрофона"} aria-pressed={$microphoneMuted} title={$microphoneMuted ? "Микрофон на паузе — включить" : "JARVIS слушает — поставить на паузу"}>
+            <span class="mic-indicator" aria-hidden="true"></span>{$microphoneMuted ? "НЕ СЛУШАТЬ" : "СЛУШАТЬ"}
+        </button>
         <button class="header-btn" on:click={() => $goto('/commands')}>
             <span class="btn-text">{t('header-commands')}</span>
             <span class="btn-badge purple">{commandsCount}+</span>
@@ -104,6 +114,13 @@
 </header>
 
 <style lang="scss">
+    .mic-toggle {display:flex;align-items:center;gap:.4rem;padding:.4rem .52rem;border:1px solid rgba(82,254,254,.45);border-radius:6px;background:rgba(22,74,78,.28);color:#c8ffff;font-size:.65rem;font-weight:700;letter-spacing:.04em;white-space:nowrap;cursor:pointer;transition:background .2s,border-color .2s}
+    .mic-toggle:hover:not(:disabled) {background:rgba(27,105,110,.48)}
+    .mic-toggle.muted {border-color:#e48787;background:rgba(116,37,43,.35);color:#ffd8d8}
+    .mic-toggle:disabled {opacity:.45;cursor:not-allowed}
+    .mic-toggle:focus-visible {outline:2px solid #fff;outline-offset:2px}
+    .mic-indicator {width:.42rem;height:.42rem;border-radius:50%;background:#52fefe;box-shadow:0 0 7px #52fefe}
+    .mic-toggle.muted .mic-indicator {background:#ff8686;box-shadow:0 0 7px #ff8686}
     .lang-selector {
         position: relative;
     }

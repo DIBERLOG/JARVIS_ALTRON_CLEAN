@@ -30,6 +30,14 @@ if weather and weather.current_condition and weather.current_condition[1] and we
         local sign = temp > 0 and "+" or ""
         local title = lang == "ru" and "Погода" or "Weather"
         local visual = city .. ": " .. sign .. temp .. " °C"
+        local current = weather.current_condition[1]
+        local description = current.weatherDesc and current.weatherDesc[1] and current.weatherDesc[1].value or ""
+        local feels = current.FeelsLikeC or "—"
+        local humidity = current.humidity or "—"
+        local wind = current.windspeedKmph or "—"
+        local detail = lang == "ru"
+            and string.format("%s · Ощущается %s°C · Влажность %s%% · Ветер %s км/ч", description, feels, humidity, wind)
+            or string.format("%s · Feels %s°C · Humidity %s%% · Wind %s km/h", description, feels, humidity, wind)
         local spoken
         if lang == "ru" then
             local prefix = temp > 0 and "плюс " or (temp < 0 and "минус " or "")
@@ -38,7 +46,7 @@ if weather and weather.current_condition and weather.current_condition[1] and we
             spoken = "Temperature in " .. city .. ": " .. sign .. temp .. " degrees Celsius."
         end
         jarvis.log("info", "Weather: " .. visual)
-        jarvis.system.notify(title, visual)
+        jarvis.system.notify(title, visual .. "\n" .. detail)
         local recorded_exact = false
         if lang == "ru" then
             -- A complete recording for this value takes priority when available.

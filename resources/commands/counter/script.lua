@@ -10,7 +10,10 @@ local msg = lang == "ru"
     or "Counter: " .. count
 
 jarvis.log("info", msg)
-jarvis.system.notify("Counter", tostring(count))
+local title = lang == "ru" and "Счётчик JARVIS" or "JARVIS counter"
+local primary = lang == "ru" and ("Выполнено: " .. count) or ("Completed: " .. count)
+local detail = lang == "ru" and "Команд обработано" or "Commands processed"
+jarvis.system.notify(title, primary .. "\n" .. detail)
 jarvis.speak(msg)
 
 return { chain = false }

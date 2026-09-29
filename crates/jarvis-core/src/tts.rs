@@ -3,14 +3,75 @@ use std::{
     path::PathBuf,
     io::{BufRead, BufReader, Write},
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
-    sync::{atomic::{AtomicUsize, Ordering}, mpsc},
+    sync::{atomic::{AtomicU32, AtomicUsize, Ordering}, mpsc},
 };
 use once_cell::sync::OnceCell;
 
 use crate::{config, APP_CONFIG_DIR, APP_DIR};
 
 static PENDING_SPEECH: AtomicUsize = AtomicUsize::new(0);
-static SPEECH_QUEUE: OnceCell<mpsc::Sender<(String, Option<Command>)>> = OnceCell::new();
+static SPEECH_GENERATION: AtomicUsize = AtomicUsize::new(0);
+static ACTIVE_TTS_PID: AtomicU32 = AtomicU32::new(0);
+static SPEECH_QUEUE: OnceCell<mpsc::Sender<(String, Option<Command>, usize)>> = OnceCell::new();
+
+fn kill_speech_process(pid: u32) {
+    #[cfg(windows)]
+    let result = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .output();
+    #[cfg(not(windows))]
+    let result = Command::new("kill").arg(pid.to_string()).output();
+    if let Err(error) = result {
+        warn!("Could not stop TTS process {pid}: {error}");
+    }
+}
+
+/// Cancel the current speech and any replies waiting in this process's queue.
+pub fn stop() {
+    SPEECH_GENERATION.fetch_add(1, Ordering::SeqCst);
+    let pid = ACTIVE_TTS_PID.swap(0, Ordering::SeqCst);
+    if pid != 0 { kill_speech_process(pid); }
+}
+
+fn run_speech_command(mut command: Command, generation: usize) -> Result<(), String> {
+    let mut child = command.spawn().map_err(|error| error.to_string())?;
+    let pid = child.id();
+    ACTIVE_TTS_PID.store(pid, Ordering::SeqCst);
+    if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
+        kill_speech_process(pid);
+    }
+    let result = child.wait().map_err(|error| error.to_string());
+    ACTIVE_TTS_PID.store(0, Ordering::SeqCst);
+    match result {
+        Ok(status) if status.success() || generation != SPEECH_GENERATION.load(Ordering::SeqCst) => Ok(()),
+        Ok(status) => Err(format!("TTS process exited with {status}")),
+        Err(error) => Err(error),
+    }
+}
+
+#[cfg(all(test, windows))]
+mod cancellation_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn stop_interrupts_the_active_speech_process() {
+        let generation = SPEECH_GENERATION.load(Ordering::SeqCst);
+        let started = Instant::now();
+        let worker = std::thread::spawn(move || {
+            let mut command = Command::new("powershell");
+            command.args(["-NoProfile", "-Command", "Start-Sleep -Seconds 20"]);
+            run_speech_command(command, generation)
+        });
+        while ACTIVE_TTS_PID.load(Ordering::SeqCst) == 0 && started.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert_ne!(ACTIVE_TTS_PID.load(Ordering::SeqCst), 0, "test process did not start");
+        stop();
+        assert!(worker.join().unwrap().is_ok());
+        assert!(started.elapsed() < Duration::from_secs(10), "speech was not interrupted promptly");
+    }
+}
 
 struct SileroWorker {
     child: Child,
@@ -75,7 +136,8 @@ pub fn speak(text: &str) -> bool {
 
     let queue = speech_queue();
     PENDING_SPEECH.fetch_add(1, Ordering::SeqCst);
-    if queue.send((text.to_owned(), command)).is_err() {
+    let generation = SPEECH_GENERATION.load(Ordering::SeqCst);
+    if queue.send((text.to_owned(), command, generation)).is_err() {
         PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
         warn!("TTS queue is unavailable.");
         return false;
@@ -83,32 +145,48 @@ pub fn speak(text: &str) -> bool {
     true
 }
 
-fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>)> {
+fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize)> {
     SPEECH_QUEUE.get_or_init(|| {
-        let (sender, receiver) = mpsc::channel::<(String, Option<Command>)>();
+        let (sender, receiver) = mpsc::channel::<(String, Option<Command>, usize)>();
         std::thread::spawn(move || {
             let tts_dir = APP_DIR.join("resources").join("tts");
             let mut silero = if selected_tts_mode() == "silero" { SileroWorker::start(&tts_dir).ok() } else { None };
-            for (spoken_text, command) in receiver {
+            for (spoken_text, command, generation) in receiver {
+                if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
+                    PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
+                    continue;
+                }
                 info!("TTS speaking: {}", spoken_text);
-                if let Some(mut command) = command {
-                    match command.spawn() {
-                        Ok(mut child) => match child.wait() {
-                            Ok(status) if !status.success() => warn!("TTS process exited with {}", status),
-                            Err(error) => warn!("TTS process failed: {}", error),
-                            _ => {}
-                        },
-                        Err(error) => warn!("Unable to start TTS: {}", error),
+                if let Some(command) = command {
+                    if let Err(error) = run_speech_command(command, generation) {
+                        warn!("TTS process failed: {error}");
                     }
                 } else {
                     if silero.is_none() { silero = SileroWorker::start(&tts_dir).ok(); }
-                    let result = silero.as_mut().ok_or("Silero worker unavailable".to_string())
-                        .and_then(|worker| worker.speak(&spoken_text));
-                    if let Err(error) = result {
+                    if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
+                        silero = None;
+                        PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
+                        continue;
+                    }
+                    ACTIVE_TTS_PID.store(silero.as_ref().map(|worker| worker.child.id()).unwrap_or(0), Ordering::SeqCst);
+                    if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
+                        let pid = ACTIVE_TTS_PID.swap(0, Ordering::SeqCst);
+                        if pid != 0 { kill_speech_process(pid); }
+                    }
+                    let result = if generation == SPEECH_GENERATION.load(Ordering::SeqCst) {
+                        silero.as_mut().ok_or("Silero worker unavailable".to_string())
+                            .and_then(|worker| worker.speak(&spoken_text))
+                    } else {
+                        Err("Speech cancelled".to_string())
+                    };
+                    ACTIVE_TTS_PID.store(0, Ordering::SeqCst);
+                    if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
+                        silero = None;
+                    } else if let Err(error) = result {
                         warn!("{error}; retrying on next reply");
                         silero = None;
-                        if let Some(mut fallback) = silero_speaker_command(&tts_dir, &spoken_text) {
-                            if let Err(error) = fallback.status() {
+                        if let Some(fallback) = silero_speaker_command(&tts_dir, &spoken_text) {
+                            if let Err(error) = run_speech_command(fallback, generation) {
                                 warn!("Silero one-shot fallback failed: {error}");
                             }
                         }

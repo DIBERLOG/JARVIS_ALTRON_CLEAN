@@ -1,13 +1,43 @@
 use std::sync::mpsc::Receiver;
 use std::time::SystemTime;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 use jarvis_core::{audio_buffer::AudioRingBuffer, audio_processing, commands, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, tts};
 use rand::seq::SliceRandom;
 
-use crate::should_stop;
+use crate::{microphone_muted, should_stop};
 
 static DIALOGUE_MODE: AtomicBool = AtomicBool::new(false);
+static LAST_COMMAND: Mutex<Option<String>> = Mutex::new(None);
+static DIALOGUE_HISTORY: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+fn dialogue_start_phrase(text: &str) -> bool {
+    matches!(dialogue_phrase(text), "давай пообщаемся" | "давай поговорим" | "включи диалоговый режим")
+}
+
+fn dialogue_stop_phrase(text: &str) -> bool {
+    matches!(dialogue_phrase(text), "закончи разговор" | "закончим разговор" |
+        "хватит общаться" | "выключи диалоговый режим" |
+        "закрой диалог" | "режим команд")
+}
+
+fn dialogue_phrase(text: &str) -> &str {
+    text.trim().trim_matches(|ch: char| ch.is_ascii_punctuation() || ch == '«' || ch == '»' || ch == '…').trim()
+}
+
+#[cfg(test)]
+mod dialogue_tests {
+    use super::{dialogue_start_phrase, dialogue_stop_phrase};
+
+    #[test]
+    fn start_and_exit_phrases_accept_terminal_punctuation() {
+        assert!(dialogue_start_phrase("давай пообщаемся!"));
+        assert!(dialogue_stop_phrase("закрой диалог."));
+        assert!(dialogue_stop_phrase("режим команд"));
+        assert!(!dialogue_stop_phrase("расскажи про режим команд"));
+    }
+}
 
 // VAD state machine
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -38,15 +68,22 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
     
     voices::play_greet();
 
-    match recorder::start_recording() {
-        Ok(_) => info!("Recording started. Microphone: {}", 
-            recorder::get_audio_device_name(recorder::get_selected_microphone_index())),
-        Err(_) => {
-            error!("Cannot start recording.");
-            return Err(());
+    let mut recording_active = false;
+    if !microphone_muted() {
+        match recorder::start_recording() {
+            Ok(_) => {
+                recording_active = true;
+                info!("Recording started. Microphone: {}",
+                    recorder::get_audio_device_name(recorder::get_selected_microphone_index()));
+            }
+            Err(_) => {
+                error!("Cannot start recording.");
+                return Err(());
+            }
         }
     }
 
+    ipc::send(IpcEvent::MicrophoneMuted { muted: microphone_muted() });
     ipc::send(IpcEvent::Idle);
 
     // ### WAKE WORD DETECTION LOOP
@@ -56,6 +93,51 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
             voices::play_goodbye();
             ipc::send(IpcEvent::Stopping);
             break;
+        }
+
+        if microphone_muted() {
+            if recording_active {
+                if recorder::stop_recording().is_err() {
+                    warn!("Could not stop microphone capture; retrying while audio processing stays paused");
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    continue 'wake_word;
+                }
+                recording_active = false;
+                audio_buffer.clear();
+                vad_state = VadState::WaitingForVoice;
+                silence_frames = 0;
+                stt::reset_wake_recognizer();
+                stt::reset_speech_recognizer();
+                ipc::send(IpcEvent::MicrophoneMuted { muted: true });
+                ipc::send(IpcEvent::Idle);
+            }
+            if let Ok(text) = text_cmd_rx.try_recv() {
+                process_text_command(&text, &rt);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            continue 'wake_word;
+        }
+
+        if !recording_active {
+            match recorder::start_recording() {
+                Ok(()) => {
+                    recording_active = true;
+                    audio_buffer.clear();
+                    vad_state = VadState::WaitingForVoice;
+                    silence_frames = 0;
+                    stt::reset_wake_recognizer();
+                    stt::reset_speech_recognizer();
+                    ipc::send(IpcEvent::MicrophoneMuted { muted: false });
+                    ipc::send(IpcEvent::Idle);
+                }
+                Err(()) => {
+                    error!("Cannot resume microphone recording");
+                    crate::MICROPHONE_MUTED.store(true, Ordering::SeqCst);
+                    ipc::send(IpcEvent::MicrophoneMuted { muted: true });
+                    ipc::send(IpcEvent::Error { message: "Не удалось включить микрофон".to_string() });
+                    continue 'wake_word;
+                }
+            }
         }
 
         // Do not feed Jarvis's own spoken answer back into wake-word detection.
@@ -71,6 +153,22 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
 
         if let Ok(text) = text_cmd_rx.try_recv() {
             process_text_command(&text, &rt);
+            continue 'wake_word;
+        }
+
+        // Dialogue stays open across utterances: no wake word is required until exit.
+        if DIALOGUE_MODE.load(Ordering::SeqCst) {
+            ipc::send(IpcEvent::Listening);
+            recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, false);
+            vad_state = VadState::WaitingForVoice;
+            silence_frames = 0;
+            audio_buffer.clear();
+            stt::reset_wake_recognizer();
+            stt::reset_speech_recognizer();
+            audio_processing::reset();
+            if !DIALOGUE_MODE.load(Ordering::SeqCst) {
+                ipc::send(IpcEvent::Idle);
+            }
             continue 'wake_word;
         }
 
@@ -181,6 +279,21 @@ fn recognize_command(
     loop {
         if crate::should_stop() {
             return;
+        }
+        if microphone_muted() {
+            return;
+        }
+
+        // Do not transcribe the assistant's own queued TTS response.
+        if tts::is_speaking() {
+            recorder::read_microphone(frame_buffer);
+            audio_buffer.clear();
+            vad_state = VadState::WaitingForVoice;
+            stt::reset_speech_recognizer();
+            silence_frames = 0;
+            start = SystemTime::now();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            continue;
         }
         
         recorder::read_microphone(frame_buffer);
@@ -343,19 +456,24 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
     let language = i18n::get_language();
-    if text.contains("давай пообщаемся") || text.contains("давай поговорим") || text.contains("включи диалоговый режим") {
+    if dialogue_start_phrase(text) {
         DIALOGUE_MODE.store(true, Ordering::SeqCst);
+        if let Ok(mut history) = DIALOGUE_HISTORY.lock() { history.clear(); }
         if !voices::play_command_reply("dialogue_start", &language) {
-            tts::speak("Режим диалога активирован. Скажите, сэр.");
+            tts::speak("Слушаю, сэр.");
         }
+        ipc::send(IpcEvent::CommandExecuted { id: "dialogue_start".to_string(), success: true });
+        ipc::send(IpcEvent::Listening);
         return true;
     }
-    if DIALOGUE_MODE.load(Ordering::SeqCst)
-        && (text.contains("закончи разговор") || text.contains("закончим разговор") || text.contains("хватит общаться") || text.contains("выключи диалоговый режим")) {
+    if DIALOGUE_MODE.load(Ordering::SeqCst) && dialogue_stop_phrase(text) {
         DIALOGUE_MODE.store(false, Ordering::SeqCst);
+        if let Ok(mut history) = DIALOGUE_HISTORY.lock() { history.clear(); }
         if !voices::play_command_reply("dialogue_stop", &language) {
-            tts::speak("Диалоговый режим отключён.");
+            tts::speak("Как скажете, сэр. Возвращаюсь в режим команд.");
         }
+        ipc::send(IpcEvent::CommandExecuted { id: "dialogue_stop".to_string(), success: true });
+        ipc::send(IpcEvent::Idle);
         return false;
     }
     // Re-read command manifests so added phrases and edited packs take effect
@@ -371,17 +489,34 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
     };
     
     let exact_command = commands::fetch_exact_command(text, commands_list);
-    if DIALOGUE_MODE.load(Ordering::SeqCst) && exact_command.is_none() {
-        match jarvis_core::chat::ask(text) {
-            Ok(answer) => { tts::speak(&answer); return true; }
+    let in_dialogue = DIALOGUE_MODE.load(Ordering::SeqCst);
+    // In dialogue, recognize real commands before treating the utterance as chat.
+    // Fuzzy phrase matching handles natural variants such as "открыть браузер".
+    let dialogue_command = if in_dialogue {
+        exact_command.or_else(|| commands::fetch_command(text, commands_list))
+    } else {
+        None
+    };
+    if in_dialogue && dialogue_command.is_none() {
+        let history = DIALOGUE_HISTORY.lock().map(|saved| saved.clone()).unwrap_or_default();
+        match jarvis_core::chat::ask_with_history(text, &history) {
+            Ok(answer) => {
+                if let Ok(mut saved) = DIALOGUE_HISTORY.lock() {
+                    saved.push((text.to_string(), answer.clone()));
+                    let excess = saved.len().saturating_sub(8);
+                    if excess > 0 { saved.drain(..excess); }
+                }
+                tts::speak(&answer);
+                return true;
+            }
             Err(error) => {
                 warn!("Dialogue chat failed: {}", error);
-                tts::speak("Не удалось получить ответ.");
+                tts::speak(&format!("Не удалось получить ответ: {error}"));
                 return true;
             }
         }
     }
-    let cmd_result = exact_command.or_else(|| {
+    let cmd_result = dialogue_command.or(exact_command).or_else(|| {
         if let Some((intent_id, confidence)) = rt.block_on(intent::classify(text)) {
             info!("Intent recognized: {} (confidence: {:.2})", intent_id, confidence);
             intent::get_command_by_intent(commands_list, &intent_id)
@@ -393,6 +528,27 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
     
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);
+
+        if cmd_config.id == "repeat_command" {
+            let previous = LAST_COMMAND.lock().ok().and_then(|saved| saved.clone());
+            if let Some(previous) = previous {
+                if !voices::play_command_reply("repeat_command", &language) {
+                    tts::speak("Повторяю последнюю команду.");
+                }
+                ipc::send(IpcEvent::CommandExecuted {
+                    id: "repeat_command".to_string(),
+                    success: true,
+                });
+                return execute_command(&previous, rt);
+            }
+            tts::speak("Пока нечего повторять.");
+            ipc::send(IpcEvent::CommandExecuted {
+                id: "repeat_command".to_string(),
+                success: false,
+            });
+            ipc::send(IpcEvent::Idle);
+            return false;
+        }
         
         // extract slots if needed
         let extracted_slots = if !cmd_config.slots.is_empty() {
@@ -408,13 +564,25 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
         // Dynamic Lua responses still speak their values after the recorded introduction.
         // Restart actions must wait for their warning clip before terminating the process.
         let play_before = matches!(cmd_config.id.as_str(),
-            "counter" | "set_city" | "test_greet_name" | "jarvis_restart" | "computer_restart");
+            "counter" | "counter_add" | "counter_subtract" | "telegram_open" |
+            "set_city" | "test_greet_name" | "jarvis_restart" | "computer_restart");
         let played_before = play_before && voices::play_command_reply(&cmd_config.id, &language);
+        if !played_before {
+            match cmd_config.id.as_str() {
+                "counter_add" => { tts::speak("Добавляю один к счётчику."); }
+                "counter_subtract" => { tts::speak("Убираю один из счётчика."); }
+                "telegram_open" => { tts::speak("Открываю Телеграм."); }
+                _ => {}
+            }
+        }
 
         match commands::execute_command(&cmd_path, &cmd_config, Some(&text), extracted_slots.as_ref()) {
             Ok(chain) => {
                 info!("Command executed successfully");
-                if cmd_config.id != "weather" && !played_before
+                if let Ok(mut saved) = LAST_COMMAND.lock() {
+                    *saved = Some(text.to_string());
+                }
+                if !matches!(cmd_config.id.as_str(), "weather" | "counter_add" | "counter_subtract" | "telegram_open") && !played_before
                     && !voices::play_command_reply(&cmd_config.id, &language) {
                     voices::play_random_from(cmd_config.get_sounds(&language).as_slice());
                 }
@@ -423,7 +591,7 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
                     success: true,
                 });
                 ipc::send(IpcEvent::Idle);
-                return chain; // return chain status from command
+                return chain || DIALOGUE_MODE.load(Ordering::SeqCst);
             }
             Err(msg) => {
                 error!("Error executing command: {}", msg);
@@ -444,7 +612,7 @@ fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
     }
     
     ipc::send(IpcEvent::Idle);
-    false // no chain on error or not found
+    DIALOGUE_MODE.load(Ordering::SeqCst)
 }
 
 
@@ -456,14 +624,16 @@ pub fn close(code: i32) {
 }
 
 fn remove_assistant_phrases(mut text: String) -> String {
-    for phrase in config::get_phrases_to_remove(&i18n::get_language()) {
+    // Strip only the wake word. Verbs such as "давай" and "покажи" are part
+    // of real commands and must survive recognition.
+    for phrase in config::get_wake_phrases(&i18n::get_language()) {
         if text == *phrase {
             return String::new();
         }
 
         if let Some(rest) = text.strip_prefix(phrase) {
-            if let Some(rest) = rest.strip_prefix(char::is_whitespace) {
-                text = rest.trim_start().to_string();
+            if rest.starts_with(|ch: char| ch.is_whitespace() || matches!(ch, ',' | ':' | '!' | '.' | '،')) {
+                text = rest.trim_start_matches(|ch: char| ch.is_whitespace() || matches!(ch, ',' | ':' | '!' | '.' | '،')).to_string();
             }
         }
     }

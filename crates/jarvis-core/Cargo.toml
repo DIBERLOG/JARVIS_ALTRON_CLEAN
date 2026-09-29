@@ -41,6 +41,7 @@ tokio = { version = "1", features = ["sync"], optional = true }
 
 mlua = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }
+quick-xml = { version = "0.38", optional = true }
 tempfile.workspace = true
 
 fastembed = { workspace = true, optional = true }
@@ -60,5 +61,5 @@ jarvis_app = [
     "ort", "ndarray", "tokenizers", "regex",]
 
 intent = ["intent-classifier", "tokio"]
-lua = ["mlua", "reqwest", "winrt-notification"]
+lua = ["mlua", "reqwest", "quick-xml", "winrt-notification"]
 lua_only = ["lua", "tokio"]

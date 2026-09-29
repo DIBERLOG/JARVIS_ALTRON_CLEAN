@@ -26,6 +26,8 @@ serde_json.workspace = true
 platform-dirs.workspace = true
 parking_lot.workspace = true
 reqwest.workspace = true
+chrono.workspace = true
+quick-xml = "0.38"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

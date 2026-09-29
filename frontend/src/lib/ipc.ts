@@ -8,9 +8,13 @@ export type JarvisState = "disconnected" | "idle" | "listening" | "processing"
 
 export const jarvisState = writable<JarvisState>("disconnected")
 export const ipcConnected = writable(false)
+export const microphoneMuted = writable(false)
+export const microphoneMuteKnown = writable(false)
 export const lastRecognizedText = writable("")
 export const lastExecutedCommand = writable("")
 export const lastError = writable("")
+export type JarvisNotification = { title: string, primary: string, detail?: string, id: number }
+export const activeNotification = writable<JarvisNotification | null>(null)
 
 // ### CONNECTION ###
 
@@ -35,17 +39,24 @@ export function disableIpc() {
 export function connectIpc(port: number = 9712) {
     if (ws?.readyState === WebSocket.OPEN) return
 
+    manualDisconnect = false
+    enabled = true
+
     ws = new WebSocket(`ws://127.0.0.1:${port}`)
 
     ws.onopen = () => {
         ipcConnected.set(true)
         jarvisState.set("idle")
+        ws?.send(JSON.stringify({ action: "get_muted" }))
         console.log("[IPC] connected")
     }
 
     ws.onclose = () => {
         ipcConnected.set(false)
+        microphoneMuteKnown.set(false)
+        jarvisState.set("disconnected")
         console.log("[IPC] disconnected")
+        scheduleReconnect()
     }
 
     ws.onerror = (err) => {
@@ -86,6 +97,7 @@ export function disconnectIpc() {
     }
 
     ipcConnected.set(false)
+    microphoneMuteKnown.set(false)
     jarvisState.set("disconnected")
 }
 
@@ -115,6 +127,20 @@ function handleEvent(data: any) {
 
         case "error":
             lastError.set(data.message || "Unknown error")
+            break
+
+        case "notification":
+            activeNotification.set({
+                title: data.title || "JARVIS",
+                primary: data.primary || "",
+                detail: data.detail || undefined,
+                id: Date.now()
+            })
+            break
+
+        case "microphone_muted":
+            microphoneMuted.set(Boolean(data.muted))
+            microphoneMuteKnown.set(true)
             break
 
         case "started":
@@ -149,6 +175,10 @@ export function sendAction(action: string, payload: Record<string, any> = {}) {
 
 export function stopJarvisApp() {
     return sendAction("stop")
+}
+
+export function setMicrophoneMuted(muted: boolean): boolean {
+    return sendAction("set_muted", { muted })
 }
 
 export function reloadCommands() {

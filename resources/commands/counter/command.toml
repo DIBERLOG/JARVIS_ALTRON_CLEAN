@@ -11,3 +11,21 @@ phrases.en = [
     "counter",
     "count",
 ]
+
+[[commands]]
+id = "counter_add"
+type = "lua"
+script = "add.lua"
+sandbox = "standard"
+timeout = 5000
+phrases.ru = ["добавь один к счётчику", "прибавь один к счётчику", "счётчик плюс один", "добавить плюс один к счётчику"]
+phrases.en = ["add one to counter", "counter plus one"]
+
+[[commands]]
+id = "counter_subtract"
+type = "lua"
+script = "subtract.lua"
+sandbox = "standard"
+timeout = 5000
+phrases.ru = ["убери один из счётчика", "вычти один из счётчика", "счётчик минус один", "убрать минус один из счётчика"]
+phrases.en = ["subtract one from counter", "counter minus one"]

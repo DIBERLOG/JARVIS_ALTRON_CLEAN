@@ -406,4 +406,27 @@ mod phrase_tests {
         assert!(!matches_phrase_template("поздоровайся с", "поздоровайся с {name}"));
         assert!(!matches_phrase_template("привет", "привет {name}"));
     }
+
+    #[test]
+    fn dialogue_examples_resolve_to_commands() {
+        crate::i18n::init("ru");
+        let manifests = [
+            include_str!("../../../resources/commands/browser/command.toml"),
+            include_str!("../../../resources/commands/discord/command.toml"),
+            include_str!("../../../resources/commands/steam/command.toml"),
+            include_str!("../../../resources/commands/weather/command.toml"),
+        ];
+        let packs: Vec<super::JCommandsList> = manifests.iter()
+            .map(|manifest| toml::from_str(manifest).expect("valid command manifest"))
+            .collect();
+        for (phrase, expected) in [
+            ("открой браузер", "browser_open"),
+            ("открой дискорд", "discord_open"),
+            ("открой стим", "game_mode"),
+            ("открой расписание", "open_schedule"),
+            ("погода в Москве", "weather"),
+        ] {
+            assert_eq!(super::fetch_exact_command(phrase, &packs).map(|(_, command)| command.id.as_str()), Some(expected));
+        }
+    }
 }

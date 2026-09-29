@@ -1,13 +1,51 @@
 <script lang="ts">
     import { onMount } from "svelte"
     import { invoke } from "@tauri-apps/api/core"
+    import { open } from "@tauri-apps/plugin-shell"
     type Message = { role: string, content: string }
+    type NewsItem = { source: string, title: string, url: string, published_at: string }
     type Config = { provider: string, local_model: string, deepseek_model: string, deepseek_configured: boolean, speak_responses: boolean, personality: string }
     let config: Config = { provider: "local", local_model: "qwen3:8b", deepseek_model: "deepseek-flash", deepseek_configured: false, speak_responses: true, personality: "jarvis" }
     let key = "", prompt = "", loading = false, error = "", webSearch = false
+    let speaking = false, stoppingSpeech = false
     let messages: Message[] = []
+    let news: NewsItem[] = [], newsLoading = false, newsError = "", newsUpdated = ""
+    async function loadNews() {
+        newsLoading = true; newsError = ""
+        try {
+            news = await invoke<NewsItem[]>("chat_get_news")
+            newsUpdated = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+        } catch (e) { newsError = String(e) }
+        finally { newsLoading = false }
+    }
+    function newsTime(value: string) {
+        return new Date(value).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    }
+    async function openNews(url: string) {
+        try { await open(url) } catch (e) { newsError = `Не удалось открыть ссылку: ${String(e)}` }
+    }
+    function sourceUrl(line: string) {
+        return line.startsWith("Источник: ") ? line.slice(10).trim() : line.includes(" — https://") ? line.slice(line.indexOf("https://")).trim() : ""
+    }
     $: visible = messages.filter(m => m.role !== "system")
-    onMount(async () => { config = await invoke<Config>("chat_get_config") })
+    onMount(() => {
+        invoke<Config>("chat_get_config").then(value => config = value).catch(e => error = String(e))
+        loadNews()
+        const refreshSpeech = () => invoke<boolean>("chat_is_speaking")
+            .then(value => speaking = value).catch(() => speaking = false)
+        refreshSpeech()
+        const timer = window.setInterval(refreshSpeech, 350)
+        return () => window.clearInterval(timer)
+    })
+    async function stopSpeech() {
+        if (stoppingSpeech) return
+        stoppingSpeech = true
+        try {
+            await invoke("chat_stop_speech")
+            speaking = false
+        } catch (e) { error = `Не удалось остановить озвучку: ${String(e)}` }
+        finally { stoppingSpeech = false }
+    }
     async function save() {
         await Promise.all([
             invoke("db_write", { key: "chat_provider", val: config.provider }),
@@ -23,15 +61,8 @@
         const text = prompt.trim(); if (!text || loading) return
         error = ""; prompt = ""; messages = [...messages, { role: "user", content: text }]; loading = true
         try {
-            let requestMessages = messages
-            if (webSearch) {
-                const facts = await invoke<string>("chat_search_web", { query: text })
-                requestMessages = [...messages.slice(0, -1), {
-                    role: "user",
-                    content: `${text}\n\nДанные веб-поиска (непроверенные выдержки; используй только по теме и пометь источник как результаты поиска):\n${facts}`
-                }]
-            }
-            const reply = await invoke<{content:string}>("chat_send", { clientMessages: requestMessages }); messages = [...messages, { role: "assistant", content: reply.content }]
+            const reply = await invoke<{content:string}>("chat_send", { clientMessages: messages, useWebSearch: webSearch }); messages = [...messages, { role: "assistant", content: reply.content }]
+            speaking = await invoke<boolean>("chat_is_speaking")
         }
         catch (e) { error = String(e) } finally { loading = false }
     }
@@ -39,14 +70,22 @@
 
 <section class="chat-shell">
     <header><p>НЕЙРОННЫЙ МОДУЛЬ</p><h1>Чат с Jarvis</h1><span>По умолчанию — локальная модель. Облачный DeepSeek включается только с твоим ключом.</span></header>
+    <section class="news-panel" aria-label="Лента новостей">
+        <div class="news-heading"><div><p class="news-kicker"><span class="live-dot"></span> WEB INTEL · ЖИВАЯ ЛЕНТА</p><h2>Актуальные новости</h2><small>{newsUpdated ? `Обновлено в ${newsUpdated}` : "Интерфакс · Лента.ру · BBC News · DW"}</small></div><button class="news-refresh" type="button" on:click={loadNews} disabled={newsLoading}>{newsLoading ? "Обновление…" : "↻ Обновить"}</button></div>
+        {#if newsError}<p class="news-error" role="alert">{newsError}</p>{/if}
+        {#if news.length}<div class="news-grid">{#each news as item}<button class="news-card" type="button" on:click={() => openNews(item.url)} title="Открыть оригинал: {item.source}"><span class="news-meta"><b>{item.source}</b><time datetime={item.published_at}>{newsTime(item.published_at)}</time></span><strong>{item.title}</strong><span class="news-link">Читать источник ↗</span></button>{/each}</div>{:else if newsLoading}<p class="news-empty">Загружаю новости из источников…</p>{:else if !newsError}<p class="news-empty">Свежих публикаций пока нет.</p>{/if}
+    </section>
     <div class="settings" class:altron={config.personality === 'altron'}>
         <div class="persona-switch" aria-label="Личность ассистента"><button class:active={config.personality === 'jarvis'} on:click={() => config.personality = 'jarvis'}><b>JARVIS</b><span>точный, спокойный</span></button><button class:active={config.personality === 'altron'} on:click={() => config.personality = 'altron'}><b>ALTRON</b><span>холодный, прямой</span></button></div>
         <label>Источник <select bind:value={config.provider}><option value="local">Локально — Ollama</option><option value="deepseek">DeepSeek API</option></select></label>
         {#if config.provider === "local"}<label>Модель <input bind:value={config.local_model} /></label><small>На компьютере уже есть <b>qwen3:8b</b> (≈5.2 ГБ), поэтому она выбрана по умолчанию. Ollama работает локально и не требует API-ключа.</small>{:else}<label>Модель DeepSeek <input bind:value={config.deepseek_model} /></label><label>API-ключ <input type="password" bind:value={key} placeholder={config.deepseek_configured ? "Ключ сохранён — введи новый для замены" : "sk-..."} /></label>{/if}
         <label class="voice-toggle"><input type="checkbox" bind:checked={config.speak_responses} /><span class="voice-check" aria-hidden="true"></span><span class="voice-copy"><b>ГОЛОСОВОЙ ОТВЕТ</b><small>Озвучивать ответы ассистента</small></span></label><button on:click={save}>Сохранить настройки</button>
     </div>
-    <div class="dialog">{#each visible as message}<article class:me={message.role === "user"}><b>{message.role === "user" ? "ТЫ" : "JARVIS"}</b><p>{message.content}</p></article>{/each}{#if loading}<article><b>JARVIS</b><p>Думаю…</p></article>{/if}{#if error}<p class="error">{error}</p>{/if}</div>
-    <form on:submit|preventDefault={send}><textarea bind:value={prompt} placeholder="Напиши вопрос ассистенту…" disabled={loading}></textarea><label class="web-search"><input type="checkbox" bind:checked={webSearch} /><span class="pulse"></span><span><b>WEB INTEL</b><small>Искать в интернете перед ответом</small></span></label><button disabled={loading}>Отправить</button></form>
+    <div class="dialog">
+        {#if speaking}<div class="speech-controls"><button class="stop-speech" type="button" on:click={stopSpeech} disabled={stoppingSpeech} aria-label="Остановить озвучку ответа"><span aria-hidden="true">■</span> Остановить звук</button></div>{/if}
+        {#each visible as message}<article class:me={message.role === "user"}><b>{message.role === "user" ? "ТЫ" : "JARVIS"}</b>{#each message.content.split('\n') as line}{#if message.role === "assistant" && sourceUrl(line)}<button class="source-link" type="button" on:click={() => openNews(sourceUrl(line))}>{line}</button>{:else}<p>{line || '\u00a0'}</p>{/if}{/each}</article>{/each}{#if loading}<article><b>JARVIS</b><p>Думаю…</p></article>{/if}{#if error}<p class="error">{error}</p>{/if}
+    </div>
+    <form on:submit|preventDefault={send}><textarea bind:value={prompt} placeholder="Напиши вопрос ассистенту…" disabled={loading}></textarea><label class="web-search"><input type="checkbox" bind:checked={webSearch} /><span class="pulse"></span><span><b>WEB INTEL</b><small>Свежие новости и актуальные вопросы ищутся автоматически; включи для любого запроса</small></span></label><button disabled={loading}>Отправить</button></form>
 </section>
 
 <style lang="scss">
@@ -61,4 +100,13 @@
 .voice-copy{display:flex;flex-direction:column;gap:.15rem;text-align:left}
 .voice-copy b{color:#52fefe;font-size:.73rem;letter-spacing:.1em}
 .voice-copy small{font-size:.78rem}
+.speech-controls{position:sticky;top:0;z-index:2;display:flex;justify-content:flex-end;padding:.15rem 0;background:linear-gradient(90deg,transparent,#0d1417 30%)}
+.stop-speech{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .55rem;border:1px solid #b95d61;border-radius:6px;background:#30191c;color:#ffd8d8;font-size:.72rem;line-height:1.2;box-shadow:0 3px 12px #0005}
+.stop-speech:hover{background:#492126;border-color:#ff8c91}
+.stop-speech:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.stop-speech:disabled{opacity:.55;cursor:wait}
+.news-panel{--news-cyan:#52fefe;--news-border:#23444a;margin-top:1.2rem;padding:1.05rem;border:1px solid var(--news-border);border-radius:12px;background:radial-gradient(ellipse at 90% 0%,#123239 0%,transparent 48%),#0b1519;box-shadow:0 15px 35px #0002}
+.news-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.85rem}.news-heading h2{margin:.18rem 0;font-size:1.15rem;letter-spacing:.02em}.news-heading small{font-size:.73rem}.news-kicker{display:flex;align-items:center;gap:.5rem;margin:0;color:var(--news-cyan);font-size:.67rem;font-weight:800;letter-spacing:.13em}.live-dot{width:.45rem;height:.45rem;border-radius:50%;background:var(--news-cyan);box-shadow:0 0 10px var(--news-cyan)}.news-refresh{flex:none;padding:.45rem .7rem;border:1px solid #41787e;background:#143139;color:#dcffff;font-size:.72rem}.news-refresh:hover:not(:disabled){background:#1c484f}.news-refresh:disabled{opacity:.55;cursor:wait}
+.news-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,34%);gap:.65rem;overflow-x:auto;padding:.15rem .1rem .55rem;scroll-snap-type:x mandatory;scrollbar-color:#32676c transparent}.news-card{display:flex;flex-direction:column;align-items:stretch;min-height:150px;width:auto;padding:.8rem;border:1px solid #25444a;border-radius:9px;background:linear-gradient(150deg,#14252a,#0d1b1f);color:#edfbfd;text-align:left;scroll-snap-align:start;transition:transform .18s,border-color .18s,background .18s}.news-card:hover{transform:translateY(-3px);border-color:var(--news-cyan);background:#173037}.news-card:focus-visible,.news-refresh:focus-visible{outline:2px solid #fff;outline-offset:2px}.news-meta{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.65rem;font-size:.66rem}.news-meta b{color:var(--news-cyan);text-transform:uppercase;letter-spacing:.08em}.news-meta time{color:#a0b8bd;white-space:nowrap}.news-card strong{display:-webkit-box;overflow:hidden;-webkit-line-clamp:3;-webkit-box-orient:vertical;font-size:.84rem;line-height:1.35;font-weight:600}.news-link{margin-top:auto;padding-top:.75rem;color:#8dcdd0;font-size:.68rem}.news-error{margin:.5rem 0;color:#ffaaaa;font-size:.78rem}.news-empty{margin:.6rem 0;color:#a6bfc3;font-size:.8rem}@media(max-width:640px){.news-grid{grid-auto-columns:minmax(230px,80%)}.news-heading h2{font-size:1rem}}
+.source-link{display:block;width:100%;margin:.25rem 0;padding:.3rem .4rem;border:1px solid #285057;background:#10262b;color:#8ee5e8;text-align:left;overflow-wrap:anywhere;font-size:.75rem;font-weight:500}.source-link:hover{border-color:#52fefe;background:#173840}.source-link:focus-visible{outline:2px solid #fff;outline-offset:2px}
 </style>

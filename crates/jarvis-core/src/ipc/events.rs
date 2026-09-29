@@ -21,6 +21,10 @@ pub enum IpcEvent {
     
     // Error occurred
     Error { message: String },
+
+    Notification { title: String, primary: String, detail: Option<String> },
+
+    MicrophoneMuted { muted: bool },
     
     // App started
     Started,
@@ -50,6 +54,8 @@ pub enum IpcAction {
     
     // Mute/unmute listening
     SetMuted { muted: bool },
+
+    GetMuted,
 
     // Execute text command
     TextCommand { text: String },

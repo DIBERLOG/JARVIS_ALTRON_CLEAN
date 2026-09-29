@@ -1,0 +1,8 @@
+[[commands]]
+id = "repeat_command"
+type = "lua"
+script = "script.lua"
+sandbox = "standard"
+timeout = 5000
+phrases.ru = ["джарвис повтори команду", "повтори команду", "повтори последнюю команду", "джарвис повтори"]
+phrases.en = ["repeat command", "repeat last command"]

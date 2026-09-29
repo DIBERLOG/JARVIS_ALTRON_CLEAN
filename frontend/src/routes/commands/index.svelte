@@ -34,16 +34,21 @@
             .includes(normalizedQuery)
     })
 
-    onMount(async () => {
+    async function refreshCommands() {
         try {
             commands = await invoke<JarvisCommand[]>("get_commands_list")
+            loadError = ""
         } catch (error) {
             loadError = `Не удалось загрузить команды: ${String(error)}`
         } finally {
             loading = false
         }
-    })
+    }
+
+    onMount(refreshCommands)
 </script>
+
+<svelte:window on:focus={refreshCommands} />
 
 <section class="command-registry" aria-labelledby="commands-title">
     <div class="registry-heading">

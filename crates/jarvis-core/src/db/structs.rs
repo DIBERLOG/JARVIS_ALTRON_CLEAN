@@ -8,6 +8,8 @@ use crate::config::structs::NoiseSuppressionBackend;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Settings {
     pub microphone: i32,
+    #[serde(default)]
+    pub microphone_muted: bool,
     pub voice: String,
 
     pub wake_word_engine: WakeWordEngine,
@@ -71,6 +73,7 @@ impl Settings {
     pub fn get(&self, key: &str) -> Option<String> {
         match key {
             "selected_microphone"       => Some(self.microphone.to_string()),
+            "microphone_muted"           => Some(self.microphone_muted.to_string()),
             "assistant_voice"           => Some(self.voice.clone()),
             "selected_wake_word_engine" => Some(format!("{:?}", self.wake_word_engine)),
             "intent_backend"            => Some(self.intent_backend.clone()),
@@ -104,6 +107,11 @@ impl Settings {
                 self.microphone = val.parse::<i32>()
                     .map_err(|_| format!("invalid integer: '{}'", val))?;
             }
+            "microphone_muted" => self.microphone_muted = match val {
+                "true" => true,
+                "false" => false,
+                _ => return Err("microphone_muted must be true or false".into()),
+            },
             "assistant_voice" => {
                 self.voice = val.to_string();
             }
@@ -174,6 +182,7 @@ impl Settings {
     pub fn keys() -> &'static [&'static str] {
         &[
             "selected_microphone",
+            "microphone_muted",
             "assistant_voice",
             "selected_wake_word_engine",
             "intent_backend",
@@ -206,6 +215,7 @@ impl Default for Settings {
     fn default() -> Settings {
         Settings {
             microphone: -1,
+            microphone_muted: false,
             voice: String::from(""),
 
             wake_word_engine: config::DEFAULT_WAKE_WORD_ENGINE,

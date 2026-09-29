@@ -41,3 +41,5 @@ pub use voices::*;
 
 mod chat;
 pub use chat::*;
+mod news;
+pub use news::*;

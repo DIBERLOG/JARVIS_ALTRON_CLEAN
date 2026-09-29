@@ -6,6 +6,7 @@
 
     import { showInExplorer } from "@/functions"
     import { appInfo, assistantVoice, translations, translate } from "@/stores"
+    import { ipcConnected, microphoneMuted, microphoneMuteKnown, setMicrophoneMuted } from "@/lib/ipc"
 
     import HDivider from "@/components/elements/HDivider.svelte"
     import Footer from "@/components/Footer.svelte"
@@ -275,6 +276,11 @@
 <Tabs class="form" color="#8AC832" position="left">
     <Tabs.Tab label={t('settings-general')} icon={Gear}>
         <Space h="sm" />
+        <section class="global-listening" class:muted={$microphoneMuted} aria-label="Глобальное прослушивание микрофона">
+            <div><p class="module-label">МИКРОФОН JARVIS</p><h3>{$microphoneMuted ? "Прослушивание на паузе" : "JARVIS слушает"}</h3><p>Выключает распознавание слова «Джарвис» и голосовых команд. Текстовый чат продолжает работать.</p></div>
+            <button type="button" on:click={() => setMicrophoneMuted(!$microphoneMuted)} disabled={!$ipcConnected || !$microphoneMuteKnown} aria-pressed={$microphoneMuted} aria-label={$microphoneMuted ? "Включить глобальное прослушивание микрофона" : "Остановить глобальное прослушивание микрофона"}>{$microphoneMuted ? "Не слушать" : "Слушать"}</button>
+        </section>
+        <Space h="xl" />
         <section class="dialogue-personality" class:altron={voiceDialoguePersonality === "altron"} aria-labelledby="dialogue-personality-title">
             <p class="module-label">ГОЛОСОВОЙ ДИАЛОГ</p>
             <h3 id="dialogue-personality-title">Характер ответов</h3>
@@ -705,4 +711,12 @@ $voice-max-visible: 3;
     color: rgba(255,255,255,0.4);
     font-style: italic;
 }
+.global-listening {display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem;border:1px solid rgba(82,254,254,.3);border-radius:9px;background:linear-gradient(110deg,#10252a,#0c1519)}
+.global-listening.muted {border-color:rgba(255,134,134,.5);background:linear-gradient(110deg,#2b1b20,#101519)}
+.global-listening h3 {margin:.2rem 0;color:#e8feff;font-size:1rem}
+.global-listening p:not(.module-label) {margin:.2rem 0 0;color:#a8bdc2;font-size:.8rem;line-height:1.4}
+.global-listening button {flex:none;padding:.5rem .7rem;border:1px solid #52fefe;border-radius:6px;background:#113b40;color:#d9ffff;font-size:.75rem;font-weight:700;cursor:pointer}
+.global-listening.muted button {border-color:#ff9696;background:#532329;color:#ffe1e1}
+.global-listening button:disabled {opacity:.5;cursor:not-allowed}
+.global-listening button:focus-visible {outline:2px solid #fff;outline-offset:2px}
 </style>

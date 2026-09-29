@@ -34,19 +34,25 @@ function Start-IfNotRunning {
 }
 
 try {
-    if (-not $voicemod) { throw 'Voicemod executable not found' }
     if (-not (Test-Path -LiteralPath $jarvisApp)) { throw "Jarvis engine not found: $jarvisApp" }
     if (-not (Test-Path -LiteralPath $jarvisGui)) { throw "Jarvis interface not found: $jarvisGui" }
 
-    if (-not (Get-Process -Name 'Voicemod' -ErrorAction SilentlyContinue)) {
+    if ($voicemod -and -not (Get-Process -Name 'Voicemod' -ErrorAction SilentlyContinue)) {
         Start-Process -FilePath $voicemod -WindowStyle Hidden
     }
-    # Let Voicemod restore its virtual devices before Jarvis opens audio.
-    Start-Sleep -Seconds 10
+    # Login-time audio and WebView2 initialization can outlive the Startup shortcut.
+    Start-Sleep -Seconds 20
     Start-IfNotRunning -ProcessName 'jarvis-app' -FilePath $jarvisApp -WorkingDirectory $jarvisRoot
-    Start-Sleep -Seconds 2
-    Start-IfNotRunning -ProcessName 'jarvis-gui' -FilePath $jarvisGui -WorkingDirectory $jarvisRoot
-    "$(Get-Date -Format o) Started Jarvis after Voicemod" | Add-Content -LiteralPath $logFile
+    Start-Sleep -Seconds 5
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Start-IfNotRunning -ProcessName 'jarvis-gui' -FilePath $jarvisGui -WorkingDirectory $jarvisRoot
+        Start-Sleep -Seconds 5
+        $gui = Get-Process -Name 'jarvis-gui' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $jarvisGui }
+        if ($gui) { break }
+        "$(Get-Date -Format o) GUI start attempt $attempt failed" | Add-Content -LiteralPath $logFile
+    }
+    if (-not $gui) { throw 'Jarvis GUI did not remain running after three attempts' }
+    "$(Get-Date -Format o) Started Jarvis; Voicemod present: $([bool]$voicemod)" | Add-Content -LiteralPath $logFile
 } catch {
     "$(Get-Date -Format o) ERROR: $_" | Add-Content -LiteralPath $logFile
     throw
