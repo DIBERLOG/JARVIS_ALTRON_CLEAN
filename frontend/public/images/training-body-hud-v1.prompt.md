@@ -1,0 +1,7 @@
+# Training body HUD illustration
+
+Generated with the built-in image generation tool. This is a decorative, schematic body illustration, not a personalized body scan or physiological measurement. Statistics markers are provided separately by the app.
+
+## Final prompt
+
+Use case: stylized-concept. Asset type: anatomical-style decorative illustration for a dark JARVIS fitness statistics dashboard. Create two FULL BODY neutral adult human athletic silhouettes, one facing front on the left, one facing rear on the right, standing upright in the same relaxed anatomical pose with arms slightly separated from torso and straight legs slightly separated. Both figures same height aligned at feet and heads. Gender-neutral faceless stylized 3D anatomical training visualization, dark translucent navy surface and fine luminous cyan/teal muscle contour wireframe, subtle internal muscle-group definition, elegant futuristic medical HUD art. Entire body including feet visible, generous clear margins; no extreme bodybuilding physique, no sexual anatomy details, no text, no letters, no symbols, no panels, no graphs, no numbers, no logos, no decorative background. Transparent background. No colored heatmap and no highlighted muscle groups yet: all contours uniformly dim cyan, as this is a neutral base asset for dynamic application data overlays. Portrait-ish composition containing both front and rear figures side by side.

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, onDestroy } from "svelte"
+    import { onMount } from "svelte"
     import { invoke } from "@tauri-apps/api/core"
 
     import SearchBar from "@/components/elements/SearchBar.svelte"
@@ -11,8 +11,6 @@
     import {
         isJarvisRunning,
         updateJarvisStats,
-        enableIpc,
-        disableIpc,
         translate,
         translations
     } from "@/stores"
@@ -21,26 +19,11 @@
 
     let processRunning = false
     let launching = false
-    let wasRunning = false  // track previous state
-
-    isJarvisRunning.subscribe((value) => {
-        processRunning = value
-        if (value) {
-            enableIpc()
-            wasRunning = true
-        } else if (wasRunning) {
-            // only disable if it was running before
-            disableIpc()
-            wasRunning = false
-        }
-    })
+    // IPC belongs to App.svelte, not this route. Navigating must keep it alive.
+    $: processRunning = $isJarvisRunning
 
     onMount(() => {
         updateJarvisStats()
-    })
-
-    onDestroy(() => {
-        disableIpc()
     })
 
     async function runAssistant() {

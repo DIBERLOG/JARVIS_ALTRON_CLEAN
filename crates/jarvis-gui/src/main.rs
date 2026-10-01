@@ -9,6 +9,8 @@ extern crate simple_log;
 mod events;
 
 mod tauri_commands;
+mod window_motion;
+mod listening_shortcut;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -43,11 +45,33 @@ fn main() {
             .expect("DB already initialized");
 
     tauri::Builder::default()
+        .setup(|app| {
+            use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(15));
+                    if !window_motion::entrance_requested() && window.is_visible().ok() == Some(false) {
+                        let _ = window.center();
+                        let _ = window.show();
+                    }
+                });
+            }
+            Ok(())
+        })
         .manage(AppState { settings: manager })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, _, event| {
+            if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                use tauri::Emitter;
+                let _ = app.emit("toggle-listening-shortcut", ());
+            }
+        }).build())
+        .manage(listening_shortcut::ListeningShortcut::default())
         .invoke_handler(tauri::generate_handler![
+            window_motion::animate_window_in,
+            listening_shortcut::set_listening_shortcut,
             // audio
             tauri_commands::pv_get_audio_devices,
             tauri_commands::pv_get_audio_device_name,
@@ -83,6 +107,11 @@ fn main() {
 
             // vosk
             tauri_commands::list_vosk_models,
+            tauri_commands::center_transcribe_audio,
+            tauri_commands::center_punctuate_text,
+            tauri_commands::set_jarvis_terminal_visible,
+            tauri_commands::password_vault_load,
+            tauri_commands::password_vault_save,
 
             // gliner
             tauri_commands::list_gliner_models,
@@ -108,6 +137,10 @@ fn main() {
             tauri_commands::chat_send,
             tauri_commands::chat_search_web,
             tauri_commands::chat_get_news,
+            tauri_commands::center_get_news,
+            tauri_commands::center_translate_news,
+            tauri_commands::center_get_weather,
+            tauri_commands::center_get_weather_city,
             tauri_commands::chat_is_speaking,
             tauri_commands::chat_stop_speech,
         ])

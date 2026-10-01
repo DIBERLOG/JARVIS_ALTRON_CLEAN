@@ -50,6 +50,10 @@ pub struct Settings {
     pub personality: String,
     #[serde(default = "default_voice_dialogue_personality")]
     pub voice_dialogue_personality: String,
+    #[serde(default)]
+    pub center_data: String,
+    #[serde(default)]
+    pub news_translation_cache: String,
 
     pub api_keys: ApiKeys,
 }
@@ -93,6 +97,8 @@ impl Settings {
             "monitor_self"              => Some(self.monitor_self.to_string()),
             "assistant_personality"      => Some(self.personality.clone()),
             "voice_dialogue_personality" => Some(self.voice_dialogue_personality.clone()),
+            "center_data"             => Some(self.center_data.clone()),
+            "news_translation_cache_v1" => Some(self.news_translation_cache.clone()),
             "api_key__picovoice"        => Some(self.api_keys.picovoice.clone()),
             "api_key__openai"           => Some(self.api_keys.openai.clone()),
             "api_key__deepseek"         => Some(self.api_keys.deepseek.clone()),
@@ -166,6 +172,17 @@ impl Settings {
             "monitor_self" => self.monitor_self = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
             "assistant_personality" => { if val != "jarvis" && val != "altron" { return Err("personality must be jarvis or altron".into()) }; self.personality = val.to_string(); }
             "voice_dialogue_personality" => { if val != "jarvis" && val != "altron" { return Err("voice dialogue personality must be jarvis or altron".into()) }; self.voice_dialogue_personality = val.to_string(); }
+            "center_data" => {
+                if val.len() > 20_000_000 { return Err("Центр превышает 20 МБ. Удалите часть изображений или заметок.".into()); }
+                serde_json::from_str::<serde_json::Value>(val).map_err(|e| format!("invalid center data: {e}"))?;
+                self.center_data = val.to_string();
+            }
+            "news_translation_cache_v1" => {
+                if val.len()>4_000_000 {return Err("Кэш переводов слишком большой".into())}
+                let entries:serde_json::Value=serde_json::from_str(val).map_err(|_|"Некорректный кэш переводов")?;
+                if !entries.is_array(){return Err("Некорректный кэш переводов".into())}
+                self.news_translation_cache=val.to_string();
+            }
             "api_key__picovoice" => {
                 self.api_keys.picovoice = val.to_string();
             }
@@ -202,6 +219,7 @@ impl Settings {
             "monitor_self",
             "assistant_personality",
             "voice_dialogue_personality",
+            "center_data",
             "api_key__picovoice",
             "api_key__openai",
             "api_key__deepseek",
@@ -241,6 +259,8 @@ impl Default for Settings {
             monitor_self: false,
             personality: default_personality(),
             voice_dialogue_personality: default_voice_dialogue_personality(),
+            center_data: String::new(),
+            news_translation_cache: String::new(),
 
             api_keys: ApiKeys {
                 picovoice: String::from(""),
@@ -285,5 +305,19 @@ mod tts_mode_tests {
         settings.set("monitor_self", "true").unwrap();
         let restored: super::Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
         assert_eq!(restored.get("monitor_self").as_deref(), Some("true"));
+    }
+}
+
+#[cfg(test)]
+mod center_data_tests {
+    use super::Settings;
+
+    #[test]
+    fn center_data_survives_settings_round_trip() {
+        let mut settings = Settings::default();
+        settings.set("center_data", r#"{"reminders":[{"id":"1","title":"Зал","dueAt":"2026-10-01T09:00","done":false}],"birthdays":[]}"#).unwrap();
+        let restored: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert!(restored.get("center_data").unwrap().contains("Зал"));
+        assert!(settings.set("center_data", "not-json").is_err());
     }
 }

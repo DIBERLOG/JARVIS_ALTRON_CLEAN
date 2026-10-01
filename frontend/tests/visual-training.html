@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>JARVIS Training · Visual QA</title></head>
+<body style="margin:0;background:#091216;padding:24px"><main id="preview" style="max-width:960px;margin:auto"></main>
+<script type="module">
+    import '@fontsource-variable/manrope/wght.css'
+    import TrainingStats from '../src/components/TrainingStats.svelte'
+    import { defaultTraining, newTraining, changeTrainingStatus } from '../src/lib/training'
+    // Isolated QA fixtures. Never written to the user's database.
+    const data = defaultTraining()
+    data.profile = { heightCm:180, measurements:[{id:'a',date:'2026-09-15',weight:82},{id:'b',date:'2026-09-22',weight:81.5},{id:'c',date:'2026-09-29',weight:81},{id:'d',date:'2026-10-01',weight:80.8}] }
+    for (let i=0;i<8;i++) {
+        const started = new Date(2026,8,10+i*3,18).getTime()
+        const session = newTraining(data.plans[i%3],data.exercises,started,{mood:3+i%3,heightCm:180,bodyWeight:82-i*.15})
+        session.sets = session.items.flatMap(item=>Array.from({length:3},(_,j)=>({id:crypto.randomUUID(),exerciseId:item.exerciseId,weight:40+i*2.5,reps:10-j,rpe:8,warmup:false,at:new Date(started+j*120000).toISOString()})))
+        data.sessions.push(changeTrainingStatus(session,'completed',started+3600000))
+    }
+    new TrainingStats({target:document.getElementById('preview'),props:{data,onSave:async()=>true}})
+</script></body></html>

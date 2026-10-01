@@ -12,6 +12,7 @@ tauri = { version = "2", features = [] } # v1: "shell-open", "dialog-message", "
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-global-shortcut = "=2.3.0"
 
 peak_alloc = "0.3.0"
 systemstat = "0.2"
@@ -28,9 +29,13 @@ parking_lot.workspace = true
 reqwest.workspace = true
 chrono.workspace = true
 quick-xml = "0.38"
+vosk = "0.3.1"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+
+[dev-dependencies]
+hound.workspace = true
 
 [features]
 default = ["custom-protocol"]

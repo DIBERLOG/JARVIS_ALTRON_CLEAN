@@ -257,6 +257,13 @@ pub fn play_random_from(sounds: &[String]) {
 /// Command replies are independent of the selected legacy voice pack.
 /// Missing clips fall back to the command's configured sounds.
 pub fn play_command_reply(command_id: &str, language: &str) -> bool {
+    let play = |path: &PathBuf| {
+        if matches!(command_id, "jarvis_restart" | "computer_restart") {
+            audio::play_sound_blocking(path)
+        } else {
+            crate::tts::play_recording(path)
+        }
+    };
     if !command_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
         return false;
     }
@@ -273,7 +280,7 @@ pub fn play_command_reply(command_id: &str, language: &str) -> bool {
         jokes.sort();
         let selected = pick_without_repeat(&jokes, LAST_JOKE_REPLY.lock().as_ref());
         if let Some(path) = selected {
-            if audio::play_sound_blocking(&path) {
+            if play(&path) {
                 *LAST_JOKE_REPLY.lock() = Some(path);
                 return true;
             }
@@ -282,7 +289,7 @@ pub fn play_command_reply(command_id: &str, language: &str) -> bool {
     }
     let path = reply_dir.join(format!("{command_id}.mp3"));
     if !path.is_file() { return false; }
-    audio::play_sound_blocking(&path)
+    play(&path)
 }
 
 fn pick_without_repeat(paths: &[PathBuf], previous: Option<&PathBuf>) -> Option<PathBuf> {

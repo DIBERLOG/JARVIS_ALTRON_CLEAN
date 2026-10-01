@@ -77,7 +77,7 @@ pub fn play_sound(filename: &PathBuf) {
 pub fn play_sound_blocking(filename: &PathBuf) -> bool {
     match AUDIO_TYPE.get() {
         Some(AudioType::Rodio) => {
-            rodio::play_sound(filename, true);
+            rodio::play_sound(filename, false);
             true
         }
         Some(AudioType::Kira) => kira::play_sound_blocking(filename),
@@ -85,6 +85,38 @@ pub fn play_sound_blocking(filename: &PathBuf) -> bool {
             warn!("Audio not initialized, cannot play: {}", filename.display());
             false
         }
+    }
+}
+
+pub fn stop() {
+    match AUDIO_TYPE.get() {
+        Some(AudioType::Kira) => kira::stop(),
+        Some(AudioType::Rodio) => rodio::stop(),
+        None => {}
+    }
+}
+
+pub fn is_playing() -> bool {
+    match AUDIO_TYPE.get() {
+        Some(AudioType::Kira) => kira::is_playing(),
+        Some(AudioType::Rodio) => rodio::is_playing(),
+        None => false
+    }
+}
+
+pub fn play_sound_cancellable(filename: &PathBuf, cancelled: impl Fn() -> bool) -> bool {
+    if cancelled() { return false; }
+    match AUDIO_TYPE.get() {
+        Some(AudioType::Kira) => kira::play_sound_cancellable(filename, cancelled),
+        Some(AudioType::Rodio) => {
+            rodio::play_sound(filename, false);
+            while rodio::is_playing() {
+                if cancelled() { rodio::stop(); return false; }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            true
+        }
+        None => false
     }
 }
 

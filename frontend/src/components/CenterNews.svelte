@@ -1,0 +1,74 @@
+<script lang="ts">
+    import {onMount,onDestroy} from 'svelte'
+    import {invoke} from '@tauri-apps/api/core'
+    import {open} from '@tauri-apps/plugin-shell'
+    type NewsItem={source:string;title:string;url:string;published_at:string;summary?:string;image_url?:string|null}
+    const topics=[['all','Главное','◈'],['ai','Нейросети','✦'],['politics','Политика','◎'],['gamedev','Геймдев','⌘'],['games','Игры','◉'],['sport','Спорт','⚡'],['tourism','Туризм и путешествия','✈'],['tech','Технологии','▣'],['science','Наука','◇'],['cinema','Кино и сериалы','▷'],['economy','Экономика','↗'],['space','Космос','✧'],['security','Кибербезопасность','▤']]
+    let topic='all',items:NewsItem[]=[],loading=false,error='',updated='',request=0,disposed=false
+    const regions=[['ru','Россия'],['us','США'],['gb','Великобритания'],['de','Германия'],['fr','Франция']]
+    const sources:Record<string,string[][]>={ru:[['interfax','Интерфакс'],['rbc','РБК'],['lenta','Лента.ру'],['tass','ТАСС'],['habr','Хабр'],['dtf','DTF']],us:[['ap','Ассошиэйтед Пресс (AP)'],['cnn','CNN'],['verge','The Verge · технологии'],['techcrunch','TechCrunch · IT'],['ign','IGN · игры'],['espn','ESPN · спорт']],gb:[['bbc','Би-би-си (BBC)'],['guardian','Гардиан (The Guardian)'],['reuters','Рейтер (Reuters)'],['eurogamer','Eurogamer · игры']],de:[['dw','Немецкая волна (DW)'],['spiegel','Шпигель (Der Spiegel)'],['heise','Heise · технологии']],fr:[['lemonde','Ле Монд (Le Monde)'],['france24','Франс 24 (France 24)'],['lefigaro','Фигаро (Le Figaro)']]}
+    let region='ru',source='all'
+    let layout='feed', brokenImages=new Set<string>(),visible=12
+    const layouts=[['feed','Лента'],['tiles','Плитки'],['compact','Компактно']]
+    function setLayout(value:string){layout=value;try{localStorage.setItem('jarvis-news-layout',value)}catch{}}
+    function imageFailed(url:string){brokenImages=new Set([...brokenImages,url])}
+    const cache=new Map<string,{items:NewsItem[];updated:string;at:number}>()
+    onDestroy(()=>{disposed=true;request++})
+    onMount(()=>{try{const saved=localStorage.getItem('jarvis-news-topic');if(topics.some(item=>item[0]===saved))topic=saved!;const preferences=JSON.parse(localStorage.getItem('jarvis-news-region')||'{}');if(regions.some(item=>item[0]===preferences.region))region=preferences.region;if(sources[region].some(item=>item[0]===preferences.source))source=preferences.source}catch{};load()})
+    async function load(force=false){
+        visible=12
+        const id=++request,key=`${topic}/${region}/${source}`,selectedRegion=region,selectedSource=source,selectedTopic=topic
+        const saved=cache.get(key)
+        error='';items=saved?.items||[];updated=saved?.updated||''
+        if(saved&&!force&&Date.now()-saved.at<300000){loading=false;return}
+        loading=true
+        try{
+            const next=await invoke<NewsItem[]>('center_get_news',{topic:selectedTopic,region:selectedRegion,source:selectedSource})
+            const stamp=new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})
+            cache.set(key,{items:next,updated:stamp,at:Date.now()})
+            if(id===request&&!disposed){items=next;updated=stamp}
+        }catch(e){if(id===request&&!disposed)error=typeof e==='string'?e:'Не удалось загрузить новости. Попробуйте ещё раз.'}
+        finally{if(id===request&&!disposed)loading=false}
+    }
+    function choose(key:string){if(key===topic)return;topic=key;try{localStorage.setItem('jarvis-news-topic',key)}catch{};load()}
+    function changeRegion(){source='all';changeSource()}
+    function changeSource(){try{localStorage.setItem('jarvis-news-region',JSON.stringify({region,source}))}catch{};load()}
+    type Translation={title:string;summary:string}
+    let translations:Record<string,Translation>={},translationErrors:Record<string,string>={},translating=new Set<string>(),translatedVisible=new Set<string>()
+    $: shownItems=items.slice(0,visible).map(item=>({...item,translation:translatedVisible.has(translationKey(item))?translations[translationKey(item)]:undefined}))
+    function translationKey(item:NewsItem){return JSON.stringify([item.url,item.title,item.summary||''])}
+    async function translate(item:NewsItem){
+        const key=translationKey(item)
+        if(translating.has(key))return
+        if(translations[key]){const next=new Set(translatedVisible);if(next.has(key))next.delete(key);else next.add(key);translatedVisible=next;return}
+        translating=new Set([...translating,key]);translationErrors={...translationErrors,[key]:''}
+        try{
+            const result=await invoke<Translation>('center_translate_news',{title:item.title,summary:item.summary||''})
+            if(!disposed){translations={...translations,[key]:result};translatedVisible=new Set([...translatedVisible,key])}
+        }catch(e){if(!disposed)translationErrors={...translationErrors,[key]:typeof e==='string'?e:'Не удалось перевести новость. Попробуйте ещё раз.'}}
+        finally{const next=new Set(translating);next.delete(key);translating=next}
+    }
+    async function read(url:string){if(!url.startsWith('https://'))return;try{await open(url)}catch{error='Не удалось открыть публикацию в браузере.'}}
+    function date(value:string){return new Date(value).toLocaleString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+    onMount(()=>{try{const value=localStorage.getItem('jarvis-news-layout');if(layouts.some(item=>item[0]===value))layout=value!}catch{}})
+</script>
+
+<section class="news-center" aria-label="Новости Центра">
+    <header><div><p>JARVIS / WORLD INTEL</p><h2>Мир на связи.</h2><span>Выберите тему — только опубликованные новости, с датами и источниками.</span></div><div class="feed-controls"><label>Регион<select bind:value={region} on:change={changeRegion}>{#each regions as [key,name]}<option value={key}>{name}</option>{/each}</select></label><label>Источники<select bind:value={source} on:change={changeSource}><option value="all">Все источники</option>{#each sources[region] as [key,name]}<option value={key}>{name}</option>{/each}</select></label><button class="refresh" disabled={loading} on:click={()=>load(true)}>{loading?'Загружаю…':'↻ Обновить'}</button></div></header>
+    <nav aria-label="Темы новостей">{#each topics as [key,label,icon]}<button class:active={topic===key} aria-pressed={topic===key} on:click={()=>choose(key)}><span>{icon}</span>{label}</button>{/each}</nav>
+    <div class="status" aria-live="polite">{#if loading}<span class="spinner" aria-hidden="true"></span>Загружаю {topics.find(item=>item[0]===topic)?.[1].toLowerCase()}…{:else if updated}Лента обновлена в {updated} · {items.length} публикаций{/if}</div>
+    {#if error}<p class="error" role="alert">{error}{#if items.length} Показана ранее загруженная лента.{/if}</p>{/if}
+    {#if !loading&&!error&&!items.length}<p class="empty">В этой теме пока нет публикаций. Выберите другую тему или обновите позже.</p>{/if}
+    <div class="view-switch" aria-label="Вид новостной ленты">{#each layouts as [key,name]}<button class:chosen={layout===key} aria-pressed={layout===key} on:click={()=>setLayout(key)}>{name}</button>{/each}<small>Предпросмотр из данных издателя</small></div>
+    <div class="news-grid" class:feed={layout==='feed'} class:compact={layout==='compact'} aria-busy={loading}>{#each shownItems as item}<article><div class="cover">{#if item.image_url?.startsWith('https://')&&!brokenImages.has(item.image_url || '')}<img src={item.image_url} alt="Иллюстрация публикации: {item.title}" loading="lazy" referrerpolicy="no-referrer" on:error={()=>imageFailed(item.image_url || '')}/>{:else}<div class="cover-placeholder"><span>{topics.find(t=>t[0]===topic)?.[2]||'◈'}</span><strong>{item.source}</strong><small>Обложка темы · без фото статьи</small></div>{/if}<span class="topic-badge">{topics.find(t=>t[0]===topic)?.[1]}</span></div><div class="article-copy"><div class="meta"><strong>{item.source}</strong><time datetime={item.published_at}>{date(item.published_at)}</time></div>{#if item.translation}<small class="translation-label">Переведено на русский</small>{/if}<h3>{item.translation?.title||item.title}</h3>{#if item.summary&&item.summary!==item.title}<p class="preview">{item.translation?.summary||item.summary}</p>{:else}<p class="preview missing">Источник не передал краткое описание. Полная публикация доступна по ссылке.</p>{/if}<div class="article-actions"><button on:click={()=>read(item.url)}>Читать публикацию ↗</button><button disabled={translating.has(translationKey(item))} on:click={()=>translate(item)}>{#if translating.has(translationKey(item))}<span class="spinner" aria-hidden="true"></span> Перевожу…{:else if item.translation}Показать оригинал{:else if translations[translationKey(item)]}Показать перевод{:else}Перевести на русский{/if}</button></div>{#if translationErrors[translationKey(item)]}<p class="error" role="alert">{translationErrors[translationKey(item)]}</p>{/if}</div></article>{/each}</div>
+    {#if visible<items.length}<button class="load-more" on:click={()=>visible+=12}>Показать ещё · {items.length-visible}</button>{/if}
+    <p class="note">Подборка через Google Новости. Ссылки могут открываться через агрегатор. Заголовки принадлежат издателям; публикация в ленте не означает проверку достоверности JARVIS.</p>
+    <p class="note">Регион задаёт локальную версию ленты, а не строгую географию каждого события. Быстрый перевод: Ollama · Qwen3 4B, локально на вашем компьютере. Готовые переводы сохраняются между запусками. Первый перевод может занять больше времени из-за загрузки модели. Машинный перевод может содержать ошибки — оригинал всегда доступен.</p>
+</section>
+
+<style>
+    .translation-label{color:var(--accent);font-size:.6rem;margin-top:.7rem}.article-actions .spinner{display:inline-block;vertical-align:middle}
+    .feed-controls{display:flex;align-items:end;gap:.6rem;flex-wrap:wrap;justify-content:flex-end}.feed-controls label{display:flex;flex-direction:column;gap:.3rem;color:#91abb1;font-size:.62rem}.feed-controls select{font:600 .7rem 'Manrope Variable',sans-serif;padding:.65rem;border:1px solid #28494f;border-radius:8px;background:#102b31;color:#eaffff;max-width:220px;color-scheme:dark}.feed-controls select:focus-visible{outline:2px solid #60f3e9;outline-offset:2px}.article-actions{margin-top:auto;display:flex;flex-wrap:wrap;gap:.6rem}@media(max-width:900px){header{flex-wrap:wrap}.feed-controls{justify-content:flex-start}}
+    .news-center{--accent:#60f3e9;--line:#28494f;color:#eaffff;font-family:'Manrope Variable',sans-serif}header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.2rem}header p{font-size:.62rem;letter-spacing:.16em;color:var(--accent);font-weight:800;margin:0}h2{font-size:1.8rem;letter-spacing:-.045em;margin:.4rem 0}header span{color:#91abb1;font-size:.75rem}button{font:600 .72rem 'Manrope Variable',sans-serif;background:#102b31;border:1px solid var(--line);border-radius:8px;padding:.65rem .8rem;color:#cceff0;cursor:pointer}.refresh{flex:none}button:disabled{opacity:.5;cursor:wait}button:hover{border-color:var(--accent)}button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}nav{display:flex;flex-wrap:wrap;gap:.45rem;padding:1rem;background:#0c1b20;border:1px solid var(--line);border-radius:12px}nav button{display:flex;align-items:center;gap:.4rem}nav button span{color:var(--accent)}nav .active{background:#174b50;border-color:var(--accent);color:white}.status{display:flex;align-items:center;gap:.5rem;min-height:40px;font-size:.68rem;color:#91abb1}.spinner{width:14px;height:14px;border:2px solid #28494f;border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}.news-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:.8rem}article{display:flex;flex-direction:column;padding:1rem;border:1px solid var(--line);border-radius:12px;background:linear-gradient(135deg,#173a3d77,#0c1b20);min-height:165px}.meta{display:flex;justify-content:space-between;gap:.7rem;font-size:.62rem}.meta strong{color:var(--accent)}time{color:#91abb1;white-space:nowrap}h3{font-size:.95rem;line-height:1.55;margin:.9rem 0 1.1rem;font-weight:650}article button{margin-top:auto;text-align:left;background:transparent;padding:.45rem 0;border:0;color:#a6e7e2}.note,.empty{font-size:.64rem;line-height:1.8;color:#91abb1}.note{margin-top:1rem}.error{padding:.8rem;border:1px solid #805157;border-radius:8px;color:#ffc4c4;font-size:.73rem;background:#351c21}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:600px){header{align-items:flex-start;flex-direction:column}.meta{flex-wrap:wrap}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}
+    .view-switch{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem}.view-switch .chosen{border-color:var(--accent);background:#174b50;color:white}.view-switch small{font-size:.62rem;color:#91abb1;margin-left:auto}.news-grid article{padding:0;overflow:hidden}.cover{position:relative;aspect-ratio:16/9;overflow:hidden;background:#0a252c}.cover img{width:100%;height:100%;object-fit:cover;display:block}.cover-placeholder{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:.5rem;background:radial-gradient(ellipse at 30% 15%,#24666c66,transparent 60%),linear-gradient(145deg,#12343b,#08171e);border-bottom:1px solid var(--line)}.cover-placeholder>span{font-size:3rem;color:#60f3e9;opacity:.8}.cover-placeholder>strong{font-size:.9rem;color:#b0dada}.cover-placeholder>small{font-size:.55rem;color:#789fa5}.topic-badge{position:absolute;top:.7rem;left:.7rem;background:#061e25d9;border:1px solid #60f3e944;border-radius:20px;padding:.3rem .55rem;color:#99e9e1;font-size:.57rem}.article-copy{display:flex;flex-direction:column;flex:1;padding:1rem;min-width:0}.preview{font-size:.72rem;line-height:1.75;color:#a4bfc4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 1rem}.missing{color:#799ca2}.news-grid.feed{grid-template-columns:1fr}.feed article{display:grid;grid-template-columns:minmax(200px,32%) minmax(0,1fr)}.feed .cover{aspect-ratio:auto;min-height:220px}.feed h3{font-size:1.15rem;margin:.75rem 0}.feed .preview{-webkit-line-clamp:4}.news-grid.compact{grid-template-columns:1fr}.compact article{display:grid;grid-template-columns:105px minmax(0,1fr);min-height:110px}.compact .cover{aspect-ratio:auto}.compact .cover-placeholder>span{font-size:1.7rem}.compact .cover-placeholder>strong,.compact .cover-placeholder>small,.compact .topic-badge,.compact .preview{display:none}.compact h3{font-size:.85rem;margin:.45rem 0}.compact .article-copy{padding:.75rem}.load-more{display:block;margin:1rem auto}@media(max-width:620px){.feed article{grid-template-columns:1fr}.feed .cover{aspect-ratio:16/9;min-height:0}.view-switch small{margin-left:0;width:100%}.compact article{grid-template-columns:75px minmax(0,1fr)}}
+</style>

@@ -1,15 +1,16 @@
 -- set city for weather command
 
-local phrase = jarvis.context.phrase
+local phrase = jarvis.context.phrase or ""
 local lang = jarvis.context.language
 
--- try to extract city name from phrase
--- this is a simple example - you might want better parsing
-local city = phrase:match("город%s+(.+)") or phrase:match("city%s+(.+)")
+local city = jarvis.context.slots and jarvis.context.slots.city
+    or phrase:match("город%s+(.+)") or phrase:match("city%s+(.+)")
 
-if city then
+if city and type(city) == "string" then
     city = city:gsub("^%s*(.-)%s*$", "%1") -- trim
     city = city:gsub("^на%s+", "")
+    city = city:gsub("^to%s+", "")
+    if city == "" then jarvis.audio.play_not_found(); return { chain = false } end
     
     -- save to state (shared with weather command)
     jarvis.state.set("city", city)

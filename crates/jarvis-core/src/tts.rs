@@ -12,7 +12,7 @@ use crate::{config, APP_CONFIG_DIR, APP_DIR};
 static PENDING_SPEECH: AtomicUsize = AtomicUsize::new(0);
 static SPEECH_GENERATION: AtomicUsize = AtomicUsize::new(0);
 static ACTIVE_TTS_PID: AtomicU32 = AtomicU32::new(0);
-static SPEECH_QUEUE: OnceCell<mpsc::Sender<(String, Option<Command>, usize)>> = OnceCell::new();
+static SPEECH_QUEUE: OnceCell<mpsc::Sender<(String, Option<Command>, usize, Option<PathBuf>)>> = OnceCell::new();
 
 fn kill_speech_process(pid: u32) {
     #[cfg(windows)]
@@ -29,6 +29,7 @@ fn kill_speech_process(pid: u32) {
 /// Cancel the current speech and any replies waiting in this process's queue.
 pub fn stop() {
     SPEECH_GENERATION.fetch_add(1, Ordering::SeqCst);
+    crate::audio::stop();
     let pid = ACTIVE_TTS_PID.swap(0, Ordering::SeqCst);
     if pid != 0 { kill_speech_process(pid); }
 }
@@ -137,7 +138,7 @@ pub fn speak(text: &str) -> bool {
     let queue = speech_queue();
     PENDING_SPEECH.fetch_add(1, Ordering::SeqCst);
     let generation = SPEECH_GENERATION.load(Ordering::SeqCst);
-    if queue.send((text.to_owned(), command, generation)).is_err() {
+    if queue.send((text.to_owned(), command, generation, None)).is_err() {
         PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
         warn!("TTS queue is unavailable.");
         return false;
@@ -145,14 +146,32 @@ pub fn speak(text: &str) -> bool {
     true
 }
 
-fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize)> {
+/// Recordings share the TTS queue so introductions and dynamic values remain ordered.
+pub fn play_recording(path: &std::path::Path) -> bool {
+    if !path.is_file() { return false; }
+    let queue = speech_queue();
+    PENDING_SPEECH.fetch_add(1, Ordering::SeqCst);
+    let generation = SPEECH_GENERATION.load(Ordering::SeqCst);
+    if queue.send((String::new(), None, generation, Some(path.to_path_buf()))).is_err() {
+        PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
+        return false;
+    }
+    true
+}
+
+fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize, Option<PathBuf>)> {
     SPEECH_QUEUE.get_or_init(|| {
-        let (sender, receiver) = mpsc::channel::<(String, Option<Command>, usize)>();
+        let (sender, receiver) = mpsc::channel::<(String, Option<Command>, usize, Option<PathBuf>)>();
         std::thread::spawn(move || {
             let tts_dir = APP_DIR.join("resources").join("tts");
             let mut silero = if selected_tts_mode() == "silero" { SileroWorker::start(&tts_dir).ok() } else { None };
-            for (spoken_text, command, generation) in receiver {
+            for (spoken_text, command, generation, recording) in receiver {
                 if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
+                    PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
+                    continue;
+                }
+                if let Some(path) = recording {
+                    crate::audio::play_sound_cancellable(&path, || generation != SPEECH_GENERATION.load(Ordering::SeqCst));
                     PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
                     continue;
                 }
@@ -197,6 +216,39 @@ fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize)> {
         });
         sender
     })
+}
+
+#[cfg(test)]
+mod recording_queue_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    #[ignore = "requires a physical audio output; plays silence only"]
+    fn recordings_do_not_block_and_can_be_interrupted() {
+        crate::audio::init().expect("audio output unavailable");
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("silent.wav");
+        let length: u32 = 16000 * 2 * 2;
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF"); wav.extend_from_slice(&(length + 36).to_le_bytes()); wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16u32.to_le_bytes()); wav.extend_from_slice(&1u16.to_le_bytes()); wav.extend_from_slice(&1u16.to_le_bytes());
+        wav.extend_from_slice(&16000u32.to_le_bytes()); wav.extend_from_slice(&32000u32.to_le_bytes());
+        wav.extend_from_slice(&2u16.to_le_bytes()); wav.extend_from_slice(&16u16.to_le_bytes());
+        wav.extend_from_slice(b"data"); wav.extend_from_slice(&length.to_le_bytes()); wav.resize(length as usize + 44, 0);
+        fs::write(&path, wav).unwrap();
+        let started = Instant::now();
+        assert!(play_recording(&path));
+        assert!(started.elapsed() < Duration::from_millis(150), "recording blocked its caller");
+        while !crate::audio::is_playing() && started.elapsed() < Duration::from_secs(1) { std::thread::sleep(Duration::from_millis(10)); }
+        assert!(crate::audio::is_playing());
+        assert!(play_recording(&path)); // Cancellation must discard queued clips too.
+        let cancelled_at = Instant::now();
+        stop();
+        while is_speaking() && cancelled_at.elapsed() < Duration::from_secs(1) { std::thread::sleep(Duration::from_millis(10)); }
+        assert!(!is_speaking(), "cancelled clips stayed queued");
+        assert!(cancelled_at.elapsed() < Duration::from_millis(500));
+    }
 }
 
 pub fn prewarm_silero() {

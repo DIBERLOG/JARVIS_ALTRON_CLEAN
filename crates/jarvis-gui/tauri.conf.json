@@ -18,8 +18,9 @@
       {
         "fullscreen": false,
         "resizable": false,
+        "visible": false,
         "title": "Jarvis Voice Assistant",
-        "width": 640,
+        "width": 860,
         "height": 800,
         "theme": "Dark"
       }

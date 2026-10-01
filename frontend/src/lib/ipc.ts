@@ -1,6 +1,6 @@
 import { writable, get } from "svelte/store"
 import { invoke } from "@tauri-apps/api/core"
-import { getCurrentWindow } from "@tauri-apps/api/window"
+import {recordRequest} from './requestHistory'
 
 // ### IPC STORES ###
 
@@ -113,6 +113,7 @@ function handleEvent(data: any) {
             break
 
         case "speech_recognized":
+            recordRequest(data.text || '', 'voice')
             lastRecognizedText.set(data.text || "")
             jarvisState.set("processing")
             break
@@ -207,10 +208,7 @@ export function sendTextCommand(text: string): boolean {
 
 async function revealWindow() {
     try {
-        const window = getCurrentWindow()
-        await window.show()
-        await window.unminimize()
-        await window.setFocus()
+        await invoke("animate_window_in", { reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches })
     } catch (e) {
         console.error("[IPC] Failed to reveal window:", e)
     }

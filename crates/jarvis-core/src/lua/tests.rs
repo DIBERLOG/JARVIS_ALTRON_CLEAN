@@ -24,6 +24,35 @@ mod tests {
         let source = fs::read_to_string(path).unwrap();
         mlua::Lua::new().load(&source).into_function().unwrap();
     }
+
+    #[test]
+    fn set_city_uses_slots_and_strips_russian_and_english_prepositions() {
+        let source = include_str!("../../../../resources/commands/weather/set_city.lua");
+        for (phrase, slot, expected) in [
+            ("измени город на Казань", None, "Казань"),
+            ("change city to London", None, "London"),
+            ("установи город распознано неверно", Some("Котельники"), "Котельники"),
+        ] {
+            let lua = mlua::Lua::new();
+            lua.load(r#"
+                jarvis = {
+                    context = { language = 'ru', slots = {} },
+                    state = { set = function(key, value) saved_city = value end },
+                    log = function() end, speak = function() end,
+                    system = { notify = function() end }, audio = { play_not_found = function() end }
+                }
+            "#).exec().unwrap();
+            let jarvis: mlua::Table = lua.globals().get("jarvis").unwrap();
+            let context: mlua::Table = jarvis.get("context").unwrap();
+            context.set("phrase", phrase).unwrap();
+            if let Some(city) = slot {
+                let slots: mlua::Table = context.get("slots").unwrap();
+                slots.set("city", city).unwrap();
+            }
+            lua.load(source).exec().unwrap();
+            assert_eq!(lua.globals().get::<String>("saved_city").unwrap(), expected);
+        }
+    }
     
     #[test]
     fn test_minimal_sandbox() {

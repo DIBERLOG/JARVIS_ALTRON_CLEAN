@@ -1,10 +1,16 @@
 <script lang="ts">
     import { onMount, onDestroy } from "svelte"
+    import { invoke } from "@tauri-apps/api/core"
     import { Router } from "@roxi/routify"
     import routes from "../.routify/routes.default.js"
     import { SvelteUIProvider } from "@svelteuidev/core"
     import Events from "./Events.svelte"
     import JarvisNotification from "./components/JarvisNotification.svelte"
+    import CenterReminderWatcher from "./components/CenterReminderWatcher.svelte"
+    import CenterTimerWatcher from "./components/CenterTimerWatcher.svelte"
+    import { initListeningShortcut } from "./lib/listeningShortcut"
+    let shortcutCleanup: (() => void) | undefined
+    let destroyed = false
 
     import {
         loadVoiceSetting,
@@ -17,6 +23,8 @@
     } from "@/stores"
 
     onMount(() => {
+        initListeningShortcut().then(cleanup => { if (destroyed) cleanup(); else shortcutCleanup = cleanup }).catch(console.error)
+        invoke("animate_window_in", { reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches }).catch(error => console.error("Не удалось показать окно JARVIS", error))
         // load static data
         loadVoiceSetting()
         loadAppInfo()
@@ -32,6 +40,8 @@
     })
 
     onDestroy(() => {
+        destroyed = true
+        shortcutCleanup?.()
         stopStatsPolling()
         disconnectIpc()
     })
@@ -43,3 +53,5 @@
 
 <Events />
 <JarvisNotification />
+<CenterReminderWatcher />
+<CenterTimerWatcher />

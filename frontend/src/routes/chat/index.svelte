@@ -2,6 +2,8 @@
     import { onMount } from "svelte"
     import { invoke } from "@tauri-apps/api/core"
     import { open } from "@tauri-apps/plugin-shell"
+    import LoadingSpinner from "@/components/LoadingSpinner.svelte"
+    import {recordRequest} from '@/lib/requestHistory'
     type Message = { role: string, content: string }
     type NewsItem = { source: string, title: string, url: string, published_at: string }
     type Config = { provider: string, local_model: string, deepseek_model: string, deepseek_configured: boolean, speak_responses: boolean, personality: string }
@@ -11,6 +13,7 @@
     let messages: Message[] = []
     let news: NewsItem[] = [], newsLoading = false, newsError = "", newsUpdated = ""
     async function loadNews() {
+        if (newsLoading) return
         newsLoading = true; newsError = ""
         try {
             news = await invoke<NewsItem[]>("chat_get_news")
@@ -59,6 +62,7 @@
     }
     async function send() {
         const text = prompt.trim(); if (!text || loading) return
+        recordRequest(text,'chat')
         error = ""; prompt = ""; messages = [...messages, { role: "user", content: text }]; loading = true
         try {
             const reply = await invoke<{content:string}>("chat_send", { clientMessages: messages, useWebSearch: webSearch }); messages = [...messages, { role: "assistant", content: reply.content }]
@@ -70,10 +74,10 @@
 
 <section class="chat-shell">
     <header><p>НЕЙРОННЫЙ МОДУЛЬ</p><h1>Чат с Jarvis</h1><span>По умолчанию — локальная модель. Облачный DeepSeek включается только с твоим ключом.</span></header>
-    <section class="news-panel" aria-label="Лента новостей">
-        <div class="news-heading"><div><p class="news-kicker"><span class="live-dot"></span> WEB INTEL · ЖИВАЯ ЛЕНТА</p><h2>Актуальные новости</h2><small>{newsUpdated ? `Обновлено в ${newsUpdated}` : "Интерфакс · Лента.ру · BBC News · DW"}</small></div><button class="news-refresh" type="button" on:click={loadNews} disabled={newsLoading}>{newsLoading ? "Обновление…" : "↻ Обновить"}</button></div>
+    <section class="news-panel" aria-label="Лента новостей" aria-busy={newsLoading}>
+        <div class="news-heading"><div><p class="news-kicker"><span class="live-dot"></span> WEB INTEL · ЖИВАЯ ЛЕНТА</p><h2>Актуальные новости</h2><small>{newsUpdated ? `Обновлено в ${newsUpdated}` : "Интерфакс · Лента.ру · BBC News · DW"}</small></div><button class="news-refresh" type="button" on:click={loadNews} disabled={newsLoading}>{#if newsLoading}<LoadingSpinner /><span>Обновление…</span>{:else}↻ Обновить{/if}</button></div>
         {#if newsError}<p class="news-error" role="alert">{newsError}</p>{/if}
-        {#if news.length}<div class="news-grid">{#each news as item}<button class="news-card" type="button" on:click={() => openNews(item.url)} title="Открыть оригинал: {item.source}"><span class="news-meta"><b>{item.source}</b><time datetime={item.published_at}>{newsTime(item.published_at)}</time></span><strong>{item.title}</strong><span class="news-link">Читать источник ↗</span></button>{/each}</div>{:else if newsLoading}<p class="news-empty">Загружаю новости из источников…</p>{:else if !newsError}<p class="news-empty">Свежих публикаций пока нет.</p>{/if}
+        {#if news.length}<div class="news-grid">{#each news as item}<button class="news-card" type="button" on:click={() => openNews(item.url)} title="Открыть оригинал: {item.source}"><span class="news-meta"><b>{item.source}</b><time datetime={item.published_at}>{newsTime(item.published_at)}</time></span><strong>{item.title}</strong><span class="news-link">Читать источник ↗</span></button>{/each}</div>{:else if newsLoading}<div class="news-loading" role="status"><LoadingSpinner size={30}/><div><strong>Загружаю свежие новости</strong><span>Проверяю четыре источника…</span></div></div>{:else if !newsError}<p class="news-empty">Свежих публикаций пока нет.</p>{/if}
     </section>
     <div class="settings" class:altron={config.personality === 'altron'}>
         <div class="persona-switch" aria-label="Личность ассистента"><button class:active={config.personality === 'jarvis'} on:click={() => config.personality = 'jarvis'}><b>JARVIS</b><span>точный, спокойный</span></button><button class:active={config.personality === 'altron'} on:click={() => config.personality = 'altron'}><b>ALTRON</b><span>холодный, прямой</span></button></div>
@@ -109,4 +113,7 @@
 .news-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.85rem}.news-heading h2{margin:.18rem 0;font-size:1.15rem;letter-spacing:.02em}.news-heading small{font-size:.73rem}.news-kicker{display:flex;align-items:center;gap:.5rem;margin:0;color:var(--news-cyan);font-size:.67rem;font-weight:800;letter-spacing:.13em}.live-dot{width:.45rem;height:.45rem;border-radius:50%;background:var(--news-cyan);box-shadow:0 0 10px var(--news-cyan)}.news-refresh{flex:none;padding:.45rem .7rem;border:1px solid #41787e;background:#143139;color:#dcffff;font-size:.72rem}.news-refresh:hover:not(:disabled){background:#1c484f}.news-refresh:disabled{opacity:.55;cursor:wait}
 .news-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,34%);gap:.65rem;overflow-x:auto;padding:.15rem .1rem .55rem;scroll-snap-type:x mandatory;scrollbar-color:#32676c transparent}.news-card{display:flex;flex-direction:column;align-items:stretch;min-height:150px;width:auto;padding:.8rem;border:1px solid #25444a;border-radius:9px;background:linear-gradient(150deg,#14252a,#0d1b1f);color:#edfbfd;text-align:left;scroll-snap-align:start;transition:transform .18s,border-color .18s,background .18s}.news-card:hover{transform:translateY(-3px);border-color:var(--news-cyan);background:#173037}.news-card:focus-visible,.news-refresh:focus-visible{outline:2px solid #fff;outline-offset:2px}.news-meta{display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-bottom:.65rem;font-size:.66rem}.news-meta b{color:var(--news-cyan);text-transform:uppercase;letter-spacing:.08em}.news-meta time{color:#a0b8bd;white-space:nowrap}.news-card strong{display:-webkit-box;overflow:hidden;-webkit-line-clamp:3;-webkit-box-orient:vertical;font-size:.84rem;line-height:1.35;font-weight:600}.news-link{margin-top:auto;padding-top:.75rem;color:#8dcdd0;font-size:.68rem}.news-error{margin:.5rem 0;color:#ffaaaa;font-size:.78rem}.news-empty{margin:.6rem 0;color:#a6bfc3;font-size:.8rem}@media(max-width:640px){.news-grid{grid-auto-columns:minmax(230px,80%)}.news-heading h2{font-size:1rem}}
 .source-link{display:block;width:100%;margin:.25rem 0;padding:.3rem .4rem;border:1px solid #285057;background:#10262b;color:#8ee5e8;text-align:left;overflow-wrap:anywhere;font-size:.75rem;font-weight:500}.source-link:hover{border-color:#52fefe;background:#173840}.source-link:focus-visible{outline:2px solid #fff;outline-offset:2px}
+    .news-refresh{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-width:112px}
+    .news-loading{display:flex;align-items:center;justify-content:center;gap:1rem;min-height:150px;border:1px solid #23444a;border-radius:9px;background:linear-gradient(135deg,#13313955,#0d1b1f);color:#d6f8f6}
+    .news-loading>div{display:flex;flex-direction:column;gap:.35rem}.news-loading strong{font-size:.8rem;font-weight:600}.news-loading span{color:#89adb3;font-size:.7rem}
 </style>

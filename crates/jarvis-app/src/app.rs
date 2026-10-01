@@ -1,7 +1,7 @@
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::time::SystemTime;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use jarvis_core::{audio_buffer::AudioRingBuffer, audio_processing, commands, config, listener, recorder, stt, COMMANDS_LIST, intent, voices, ipc::{self, IpcEvent}, i18n, slots, tts};
 use rand::seq::SliceRandom;
@@ -9,8 +9,48 @@ use rand::seq::SliceRandom;
 use crate::{microphone_muted, should_stop};
 
 static DIALOGUE_MODE: AtomicBool = AtomicBool::new(false);
+static CHAIN_LISTENING: AtomicBool = AtomicBool::new(false);
 static LAST_COMMAND: Mutex<Option<String>> = Mutex::new(None);
 static DIALOGUE_HISTORY: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+// Execute commands serially off the capture thread. Slow Lua, network requests,
+// model replies and restart warning clips must not suspend wake-word detection.
+struct CommandDispatcher {
+    sender: SyncSender<String>,
+    pending: Arc<AtomicUsize>,
+}
+
+impl CommandDispatcher {
+    fn start(mut execute: impl FnMut(&str) -> bool + Send + 'static) -> Self {
+        let (sender, receiver) = mpsc::sync_channel::<String>(8);
+        let pending = Arc::new(AtomicUsize::new(0));
+        let worker_pending = pending.clone();
+        std::thread::spawn(move || {
+            for text in receiver {
+                if should_stop() { worker_pending.fetch_sub(1, Ordering::SeqCst); continue; }
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute(&text)));
+                CHAIN_LISTENING.store(result.unwrap_or_else(|_| {
+                    ipc::send(IpcEvent::Error { message: "Ошибка выполнения команды".to_string() });
+                    false
+                }), Ordering::SeqCst);
+                worker_pending.fetch_sub(1, Ordering::SeqCst);
+            }
+        });
+        Self { sender, pending }
+    }
+
+    fn submit(&self, text: &str) -> bool {
+        self.pending.fetch_add(1, Ordering::SeqCst);
+        if self.sender.try_send(text.to_string()).is_err() {
+            self.pending.fetch_sub(1, Ordering::SeqCst);
+            ipc::send(IpcEvent::Error { message: "Очередь команд занята. Попробуйте через несколько секунд.".to_string() });
+            return false;
+        }
+        true
+    }
+
+    fn busy(&self) -> bool { self.pending.load(Ordering::SeqCst) > 0 }
+}
 
 fn dialogue_start_phrase(text: &str) -> bool {
     matches!(dialogue_phrase(text), "давай пообщаемся" | "давай поговорим" | "включи диалоговый режим")
@@ -39,6 +79,37 @@ mod dialogue_tests {
     }
 }
 
+#[cfg(test)]
+mod dispatcher_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn slow_commands_leave_listener_free_and_keep_execution_order() {
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (done_tx, done_rx) = mpsc::channel();
+        let dispatcher = CommandDispatcher::start(move |text| {
+            if text == "first" {
+                entered_tx.send(()).unwrap();
+                release_rx.recv_timeout(Duration::from_secs(3)).unwrap();
+            }
+            done_tx.send(text.to_string()).unwrap();
+            false
+        });
+        assert!(dispatcher.submit("first"));
+        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        let started = Instant::now();
+        assert!(dispatcher.submit("second"));
+        assert!(started.elapsed() < Duration::from_millis(100));
+        assert!(dispatcher.busy());
+        assert!(done_rx.try_recv().is_err());
+        release_tx.send(()).unwrap();
+        assert_eq!(done_rx.recv_timeout(Duration::from_secs(2)).unwrap(), "first");
+        assert_eq!(done_rx.recv_timeout(Duration::from_secs(2)).unwrap(), "second");
+    }
+}
+
 // VAD state machine
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum VadState {
@@ -51,6 +122,8 @@ pub fn start(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
 }
 
 fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Result<(), ()> {
+    let command_runtime = rt.handle().clone();
+    let dispatcher = CommandDispatcher::start(move |text| execute_command(text, &command_runtime));
     let frame_length: usize = 512;
     let sample_rate: usize = 16000;
     let mut frame_buffer: Vec<i16> = vec![0; frame_length];
@@ -112,7 +185,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                 ipc::send(IpcEvent::Idle);
             }
             if let Ok(text) = text_cmd_rx.try_recv() {
-                process_text_command(&text, &rt);
+                process_text_command(&text, &dispatcher);
             }
             std::thread::sleep(std::time::Duration::from_millis(50));
             continue 'wake_word;
@@ -140,26 +213,18 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
             }
         }
 
-        // Do not feed Jarvis's own spoken answer back into wake-word detection.
-        if tts::is_speaking() {
-            recorder::read_microphone(&mut frame_buffer);
-            audio_buffer.clear();
-            vad_state = VadState::WaitingForVoice;
-            stt::reset_wake_recognizer();
-            stt::reset_speech_recognizer();
-            std::thread::sleep(std::time::Duration::from_millis(20));
-            continue 'wake_word;
-        }
-
         if let Ok(text) = text_cmd_rx.try_recv() {
-            process_text_command(&text, &rt);
+            process_text_command(&text, &dispatcher);
             continue 'wake_word;
         }
 
         // Dialogue stays open across utterances: no wake word is required until exit.
-        if DIALOGUE_MODE.load(Ordering::SeqCst) {
+        // Keep wake-word detection live during playback. Open-mic dialogue/chaining
+        // resumes only after playback, so ordinary assistant speech is not a command.
+        if !dispatcher.busy() && !playback_active() && (DIALOGUE_MODE.load(Ordering::SeqCst) || CHAIN_LISTENING.swap(false, Ordering::SeqCst)) {
+            CHAIN_LISTENING.store(false, Ordering::SeqCst);
             ipc::send(IpcEvent::Listening);
-            recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, false);
+            recognize_command(&mut frame_buffer, &dispatcher, frame_length, sample_rate, false);
             vad_state = VadState::WaitingForVoice;
             silence_frames = 0;
             audio_buffer.clear();
@@ -202,6 +267,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     // WAKE WORD DETECTED!
                     info!("Wake word activated!");
                     ipc::send(IpcEvent::WakeWordDetected);
+                    if playback_active() { tts::stop(); }
                     
                     stt::reset_wake_recognizer();
                     audio_processing::reset();
@@ -215,7 +281,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
                     }
 
                     ipc::send(IpcEvent::Listening);
-                    recognize_command(&mut frame_buffer, &rt, frame_length, sample_rate, true);
+                    recognize_command(&mut frame_buffer, &dispatcher, frame_length, sample_rate, true);
 
                     // reset state after command
                     vad_state = VadState::WaitingForVoice;
@@ -257,7 +323,7 @@ fn main_loop(text_cmd_rx: Receiver<String>, rt: &tokio::runtime::Runtime) -> Res
 // Voice recognition for command after wake word
 fn recognize_command(
     frame_buffer: &mut [i16],
-    rt: &tokio::runtime::Runtime,
+    dispatcher: &CommandDispatcher,
     frame_length: usize,
     sample_rate: usize,
     prefed_audio: bool
@@ -284,17 +350,9 @@ fn recognize_command(
             return;
         }
 
-        // Do not transcribe the assistant's own queued TTS response.
-        if tts::is_speaking() {
-            recorder::read_microphone(frame_buffer);
-            audio_buffer.clear();
-            vad_state = VadState::WaitingForVoice;
-            stt::reset_speech_recognizer();
-            silence_frames = 0;
-            start = SystemTime::now();
-            std::thread::sleep(std::time::Duration::from_millis(20));
-            continue;
-        }
+        // An explicit wake word allows barge-in. Otherwise return to the main
+        // wake-word loop rather than discarding all microphone input during speech.
+        if !prefed_audio && playback_active() { return; }
         
         recorder::read_microphone(frame_buffer);
         let processed = audio_processing::process(frame_buffer);
@@ -390,23 +448,8 @@ fn recognize_command(
                     }
                     
                     // execute command and check if we should chain
-                    let should_chain = execute_command(&recognized_voice, rt);
-                    
-                    if should_chain {
-                        // chain: reset and continue listening
-                        info!("Chaining enabled, continuing to listen...");
-                        stt::reset_speech_recognizer();
-                        vad_state = VadState::WaitingForVoice;
-                        silence_frames = 0;
-                        start = SystemTime::now();
-                        audio_buffer.clear();
-                        ipc::send(IpcEvent::Listening);
-                        continue;
-                    } else {
-                        // no chain: return to wake word
-                        info!("No chain, returning to wake word mode.");
-                        return;
-                    }
+                    dispatcher.submit(&recognized_voice);
+                    return;
                 }
                 
                 // track silence
@@ -434,7 +477,9 @@ fn recognize_command(
 }
 
 
-fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
+fn playback_active() -> bool { tts::is_speaking() || jarvis_core::audio::is_playing() }
+
+fn process_text_command(text: &str, dispatcher: &CommandDispatcher) {
     info!("Processing text command: {}", text);
     
     ipc::send(IpcEvent::SpeechRecognized { text: text.to_string() });
@@ -449,12 +494,13 @@ fn process_text_command(text: &str, rt: &tokio::runtime::Runtime) {
     }
     
     // text commands never chain
-    execute_command(filtered, rt);
+    if playback_active() { tts::stop(); }
+    dispatcher.submit(filtered);
 }
 
 
 // Execute command, returns true if chaining should continue
-fn execute_command(text: &str, rt: &tokio::runtime::Runtime) -> bool {
+fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
     let language = i18n::get_language();
     if dialogue_start_phrase(text) {
         DIALOGUE_MODE.store(true, Ordering::SeqCst);

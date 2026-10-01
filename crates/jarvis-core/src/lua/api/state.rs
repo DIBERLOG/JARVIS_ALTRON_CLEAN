@@ -13,7 +13,11 @@ pub fn register(lua: &Lua, jarvis: &Table, command_path: &PathBuf) -> mlua::Resu
     
     // jarvis.state.get(key)
     let state_path_get = state_path.clone();
+    let shared_weather_city = command_path.file_name().and_then(|name| name.to_str()) == Some("weather");
     let get_fn = lua.create_function(move |lua, key: String| {
+        if shared_weather_city && key == "city" {
+            return json_to_lua_value(lua, serde_json::Value::String(crate::weather_city::get()));
+        }
         let data = load_state(&state_path_get);
         
         if let Some(value) = data.get(&key) {
@@ -27,6 +31,11 @@ pub fn register(lua: &Lua, jarvis: &Table, command_path: &PathBuf) -> mlua::Resu
     // jarvis.state.set(key, value)
     let state_path_set = state_path.clone();
     let set_fn = lua.create_function(move |_, (key, value): (String, Value)| {
+        if shared_weather_city && key == "city" {
+            let Value::String(city) = value else { return Err(mlua::Error::runtime("Город должен быть строкой")); };
+            crate::weather_city::set(city.to_str()?.as_ref()).map_err(mlua::Error::runtime)?;
+            return Ok(true);
+        }
         let mut data = load_state(&state_path_set);
         
         let json_value = lua_to_json_value(value)?;

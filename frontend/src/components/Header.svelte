@@ -77,6 +77,7 @@
         <button class="mic-toggle" class:muted={$microphoneMuted} on:click={() => setMicrophoneMuted(!$microphoneMuted)} disabled={!$ipcConnected || !$microphoneMuteKnown} aria-label={$microphoneMuted ? "Включить глобальное прослушивание микрофона" : "Остановить глобальное прослушивание микрофона"} aria-pressed={$microphoneMuted} title={$microphoneMuted ? "Микрофон на паузе — включить" : "JARVIS слушает — поставить на паузу"}>
             <span class="mic-indicator" aria-hidden="true"></span>{$microphoneMuted ? "НЕ СЛУШАТЬ" : "СЛУШАТЬ"}
         </button>
+        <button class="header-btn center-nav" on:click={() => $goto('/center')}>ЦЕНТР</button>
         <button class="header-btn" on:click={() => $goto('/commands')}>
             <span class="btn-text">{t('header-commands')}</span>
             <span class="btn-badge purple">{commandsCount}+</span>
@@ -121,6 +122,8 @@
     .mic-toggle:focus-visible {outline:2px solid #fff;outline-offset:2px}
     .mic-indicator {width:.42rem;height:.42rem;border-radius:50%;background:#52fefe;box-shadow:0 0 7px #52fefe}
     .mic-toggle.muted .mic-indicator {background:#ff8686;box-shadow:0 0 7px #ff8686}
+    .center-nav {color:#72efe6;border:1px solid #326d70;background:#123237}
+    .center-nav:hover {background:#185057}
     .lang-selector {
         position: relative;
     }

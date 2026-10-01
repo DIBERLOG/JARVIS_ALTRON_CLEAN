@@ -6,6 +6,30 @@ use std::time::Duration;
 use serde::Serialize;
 use crate::AppState;
 
+#[tauri::command]
+pub fn set_jarvis_terminal_visible(visible:bool)->Result<(),String>{
+    #[cfg(windows)] {
+        // Console visibility only; never terminate the assistant process.
+        #[link(name="kernel32")]
+        unsafe extern "system" {fn GetConsoleWindow()->*mut std::ffi::c_void;fn AttachConsole(pid:u32)->i32;fn FreeConsole()->i32;}
+        #[link(name="user32")]
+        unsafe extern "system" {fn ShowWindow(window:*mut std::ffi::c_void,command:i32)->i32;}
+        static LOCK:Mutex<()>=Mutex::new(());
+        let _guard=LOCK.lock().map_err(|_|"Не удалось изменить видимость терминала")?;
+        let mut sys=System::new();sys.refresh_processes(sysinfo::ProcessesToUpdate::All,true);
+        let pid=find_jarvis_app_pid(&sys).ok_or("Сначала запустите голосовой модуль JARVIS")?;
+        unsafe {
+            let mut window=GetConsoleWindow();let mut attached=false;
+            if window.is_null(){if AttachConsole(pid.as_u32())==0{return Err("У голосового модуля нет доступного окна терминала".into())}attached=true;window=GetConsoleWindow();}
+            if window.is_null(){if attached{FreeConsole();}return Err("Окно терминала недоступно".into())}
+            ShowWindow(window,if visible{5}else{0});
+            if attached{FreeConsole();}
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))] {let _=visible;Err("Управление терминалом доступно только в Windows".into())}
+}
+
 #[global_allocator]
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 

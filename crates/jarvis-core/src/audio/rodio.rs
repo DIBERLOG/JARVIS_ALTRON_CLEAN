@@ -16,6 +16,9 @@ use rodio::{Decoder, OutputStream, Sink};
 static STREAM_HANDLE: OnceCell<OutputStream> = OnceCell::new();
 static SINK: OnceCell<Sink> = OnceCell::new();
 
+pub fn stop() { if let Some(sink) = SINK.get() { sink.clear(); } }
+pub fn is_playing() -> bool { SINK.get().is_some_and(|sink| !sink.empty()) }
+
 pub fn init() -> Result<(), ()> {
     if STREAM_HANDLE.get().is_some() {
         return Ok(());

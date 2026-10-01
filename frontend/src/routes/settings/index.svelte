@@ -10,6 +10,7 @@
 
     import HDivider from "@/components/elements/HDivider.svelte"
     import Footer from "@/components/Footer.svelte"
+    import ListeningShortcut from "@/components/ListeningShortcut.svelte"
 
     import {
         Notification,
@@ -280,6 +281,8 @@
             <div><p class="module-label">МИКРОФОН JARVIS</p><h3>{$microphoneMuted ? "Прослушивание на паузе" : "JARVIS слушает"}</h3><p>Выключает распознавание слова «Джарвис» и голосовых команд. Текстовый чат продолжает работать.</p></div>
             <button type="button" on:click={() => setMicrophoneMuted(!$microphoneMuted)} disabled={!$ipcConnected || !$microphoneMuteKnown} aria-pressed={$microphoneMuted} aria-label={$microphoneMuted ? "Включить глобальное прослушивание микрофона" : "Остановить глобальное прослушивание микрофона"}>{$microphoneMuted ? "Не слушать" : "Слушать"}</button>
         </section>
+        <Space h="xl" />
+        <ListeningShortcut />
         <Space h="xl" />
         <section class="dialogue-personality" class:altron={voiceDialoguePersonality === "altron"} aria-labelledby="dialogue-personality-title">
             <p class="module-label">ГОЛОСОВОЙ ДИАЛОГ</p>

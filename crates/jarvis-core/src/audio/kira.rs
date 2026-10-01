@@ -9,10 +9,25 @@ use std::sync::Mutex;
 
 use kira::{
     AudioManager, AudioManagerSettings, DefaultBackend,
-    sound::static_sound::StaticSoundData,
+    sound::{static_sound::{StaticSoundData, StaticSoundHandle}, PlaybackState}, Tween,
 };
 
 static MANAGER: OnceCell<Mutex<AudioManager>> = OnceCell::new();
+static PLAYING: Mutex<Vec<StaticSoundHandle>> = Mutex::new(Vec::new());
+
+pub fn stop() {
+    if let Ok(mut playing) = PLAYING.lock() {
+        for handle in playing.iter_mut() { handle.stop(Tween { duration: std::time::Duration::from_millis(40), ..Default::default() }); }
+    }
+}
+
+pub fn is_playing() -> bool {
+    if let Ok(mut playing) = PLAYING.lock() {
+        playing.retain(|handle| handle.state() != PlaybackState::Stopped);
+        return !playing.is_empty();
+    }
+    false
+}
 
 pub fn init() -> Result<(), ()> {
     if MANAGER.get().is_some() {
@@ -47,8 +62,9 @@ pub fn play_sound(filename: &PathBuf) {
             // play it (non-blocking)
             if let Some(manager) = MANAGER.get() {
                 if let Ok(mut audio_manager) = manager.lock() {
-                    if let Err(e) = audio_manager.play(sound_data) {
-                        warn!("Failed to play sound: {}", e);
+                    match audio_manager.play(sound_data) {
+                        Ok(handle) => if let Ok(mut playing) = PLAYING.lock() { playing.retain(|sound| sound.state() != PlaybackState::Stopped); playing.push(handle); },
+                        Err(e) => warn!("Failed to play sound: {}", e),
                     }
                 }
             } else {
@@ -62,6 +78,10 @@ pub fn play_sound(filename: &PathBuf) {
 }
 
 pub fn play_sound_blocking(filename: &PathBuf) -> bool {
+    play_sound_cancellable(filename, || false)
+}
+
+pub fn play_sound_cancellable(filename: &PathBuf, cancelled: impl Fn() -> bool) -> bool {
     let sound_data = match StaticSoundData::from_file(filename) {
         Ok(data) => data,
         Err(err) => {
@@ -72,11 +92,17 @@ pub fn play_sound_blocking(filename: &PathBuf) -> bool {
     let duration = sound_data.duration();
     let Some(manager) = MANAGER.get() else { return false; };
     let Ok(mut audio_manager) = manager.lock() else { return false; };
-    if let Err(err) = audio_manager.play(sound_data) {
-        warn!("Failed to play command reply: {}", err);
-        return false;
-    }
+    if cancelled() { return false; }
+    let handle = match audio_manager.play(sound_data) {
+        Ok(handle) => handle,
+        Err(err) => { warn!("Failed to play command reply: {}", err); return false; }
+    };
+    let started = std::time::Instant::now();
+    if let Ok(mut playing) = PLAYING.lock() { playing.retain(|sound| sound.state() != PlaybackState::Stopped); playing.push(handle); }
     drop(audio_manager);
-    std::thread::sleep(duration);
+    while started.elapsed() < duration + std::time::Duration::from_millis(200) && is_playing() {
+        if cancelled() { stop(); return false; }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
     true
 }

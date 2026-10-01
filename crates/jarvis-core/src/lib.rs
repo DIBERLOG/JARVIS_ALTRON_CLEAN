@@ -15,6 +15,7 @@ pub mod config;
 pub mod db;
 pub mod i18n;
 pub mod notifications;
+pub mod weather_city;
 
 #[cfg(feature = "jarvis_app")]
 pub mod listener;

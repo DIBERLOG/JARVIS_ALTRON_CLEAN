@@ -133,7 +133,13 @@ pub fn chat_get_config(state: tauri::State<'_, AppState>) -> ChatConfig {
 }
 
 #[tauri::command]
-pub fn chat_send(state: tauri::State<'_, AppState>, client_messages: Vec<ChatMessage>, use_web_search: bool) -> Result<ChatReply, String> {
+pub async fn chat_send(state: tauri::State<'_, AppState>, client_messages: Vec<ChatMessage>, use_web_search: bool) -> Result<ChatReply, String> {
+    let state = AppState { settings: state.settings.clone() };
+    tauri::async_runtime::spawn_blocking(move || send_chat(&state, client_messages, use_web_search)).await
+        .map_err(|e| format!("Не удалось получить ответ: {e}"))?
+}
+
+fn send_chat(state: &AppState, client_messages: Vec<ChatMessage>, use_web_search: bool) -> Result<ChatReply, String> {
     if client_messages.is_empty() || client_messages.len() > 20 { return Err("История чата пуста или слишком длинная".into()); }
     if client_messages.iter().any(|m| m.content.trim().is_empty() || m.content.len() > 12_000) { return Err("Некорректное сообщение".into()); }
     let provider = state.settings.read("chat_provider").unwrap_or_else(|| "local".into());
@@ -145,7 +151,7 @@ pub fn chat_send(state: tauri::State<'_, AppState>, client_messages: Vec<ChatMes
     if use_web_search || needs_live_info(&latest) {
         let now = chrono::Local::now().to_rfc3339();
         let facts = if is_news_request(&latest) {
-            let items = super::news::chat_get_news()?;
+            let items = super::news::fetch_news()?;
             source_footer = items.iter().take(4).map(|item| format!("{} ({}) — {}", item.source, item.published_at, item.url)).collect::<Vec<_>>().join("\n");
             items.iter().take(10).map(|item| format!("{} | {} | {} | {}", item.source, item.published_at, item.title, item.url)).collect::<Vec<_>>().join("\n")
         } else {

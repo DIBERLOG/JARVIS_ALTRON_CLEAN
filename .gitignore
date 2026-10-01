@@ -20,6 +20,12 @@ lerna-debug.log*
 *.sw?
 
 # Etc
+# Private local data: never publish password vaults, settings or recordings.
+password-vault-v1.json
+password-vault-v1.tmp
+.env
+.env.*
+!.env.example
 __other
 psd
 list.py
