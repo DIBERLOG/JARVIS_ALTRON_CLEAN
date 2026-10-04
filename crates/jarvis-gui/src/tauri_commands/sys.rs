@@ -7,27 +7,50 @@ use serde::Serialize;
 use crate::AppState;
 
 #[tauri::command]
-pub fn set_jarvis_terminal_visible(visible:bool)->Result<(),String>{
-    #[cfg(windows)] {
-        // Console visibility only; never terminate the assistant process.
-        #[link(name="kernel32")]
-        unsafe extern "system" {fn GetConsoleWindow()->*mut std::ffi::c_void;fn AttachConsole(pid:u32)->i32;fn FreeConsole()->i32;}
-        #[link(name="user32")]
-        unsafe extern "system" {fn ShowWindow(window:*mut std::ffi::c_void,command:i32)->i32;}
-        static LOCK:Mutex<()>=Mutex::new(());
-        let _guard=LOCK.lock().map_err(|_|"Не удалось изменить видимость терминала")?;
-        let mut sys=System::new();sys.refresh_processes(sysinfo::ProcessesToUpdate::All,true);
-        let pid=find_jarvis_app_pid(&sys).ok_or("Сначала запустите голосовой модуль JARVIS")?;
-        unsafe {
-            let mut window=GetConsoleWindow();let mut attached=false;
-            if window.is_null(){if AttachConsole(pid.as_u32())==0{return Err("У голосового модуля нет доступного окна терминала".into())}attached=true;window=GetConsoleWindow();}
-            if window.is_null(){if attached{FreeConsole();}return Err("Окно терминала недоступно".into())}
-            ShowWindow(window,if visible{5}else{0});
-            if attached{FreeConsole();}
-        }
-        Ok(())
+pub async fn get_jarvis_terminal_log() -> Result<String,String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let path=jarvis_core::APP_LOG_DIR.get().ok_or("Папка логов ещё не готова")?
+            .join(jarvis_core::config::LOG_FILE_NAME);
+        let mut file=match std::fs::File::open(path) {
+            Ok(file)=>file,
+            Err(error) if error.kind()==std::io::ErrorKind::NotFound=>return Ok(String::new()),
+            Err(_)=>return Err("Не удалось прочитать лог JARVIS. Повторите попытку.".into()),
+        };
+        read_log_tail(&mut file).map_err(|_|"Лог обновляется. Повторите попытку.".into())
+    }).await.map_err(|_|"Не удалось загрузить лог JARVIS".to_string())?
+}
+
+fn read_log_tail(reader:&mut (impl std::io::Read + std::io::Seek)) -> std::io::Result<String> {
+    use std::io::{Read, SeekFrom};
+    let length=reader.seek(SeekFrom::End(0))?;
+    let start=length.saturating_sub(64*1024);
+    reader.seek(SeekFrom::Start(start))?;
+    let mut bytes=Vec::new();
+    (&mut *reader).take(64*1024).read_to_end(&mut bytes)?;
+    // Skip the first partial line (and potentially split UTF-8 codepoint).
+    let offset=if start>0 {bytes.iter().position(|byte|*byte==b'\n').map(|i|i+1).unwrap_or(bytes.len())} else {0};
+    let text=String::from_utf8_lossy(&bytes[offset..]);
+    let lines:Vec<_>=text.lines().rev().take(300).collect();
+    Ok(lines.into_iter().rev().collect::<Vec<_>>().join("\n"))
+}
+
+#[cfg(test)]
+mod terminal_tests {
+    use super::read_log_tail;
+    #[test]
+    fn tail_preserves_russian_and_limits_lines() {
+        let text=(0..500).map(|i|format!("Запрос {i}\n")).collect::<String>();
+        let result=read_log_tail(&mut std::io::Cursor::new(text.into_bytes())).unwrap();
+        assert_eq!(result.lines().count(),300);
+        assert!(result.starts_with("Запрос 200\n"));
+        assert!(result.ends_with("Запрос 499"));
     }
-    #[cfg(not(windows))] {let _=visible;Err("Управление терминалом доступно только в Windows".into())}
+    #[test]
+    fn tail_handles_large_and_empty_files() {
+        assert_eq!(read_log_tail(&mut std::io::Cursor::new(Vec::<u8>::new())).unwrap(),"");
+        let text=format!("{}\nПоследний запрос\n","x".repeat(70000));
+        assert_eq!(read_log_tail(&mut std::io::Cursor::new(text.into_bytes())).unwrap(),"Последний запрос");
+    }
 }
 
 #[global_allocator]

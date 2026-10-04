@@ -34,6 +34,8 @@ pub fn stop() {
     if pid != 0 { kill_speech_process(pid); }
 }
 
+pub fn generation() -> usize { SPEECH_GENERATION.load(Ordering::SeqCst) }
+
 fn run_speech_command(mut command: Command, generation: usize) -> Result<(), String> {
     let mut child = command.spawn().map_err(|error| error.to_string())?;
     let pid = child.id();
@@ -85,7 +87,18 @@ impl SileroWorker {
         let python = training_python().ok_or("Training Python is unavailable")?;
         let script = tts_dir.join("SileroSpeak.py");
         if !script.is_file() { return Err("SileroSpeak.py is unavailable".into()); }
-        let mut child = Command::new(python).arg(script).arg("--server")
+        let mut command = if selected_tts_mode() == "xtts" {
+            xtts_speaker_command(tts_dir, "") .ok_or("XTTS unavailable")?
+        } else {
+            let mut command = Command::new(python);
+            command.arg(script);
+            command
+        };
+        #[cfg(windows)] {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        let mut child = command.arg("--server")
             .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
             .spawn().map_err(|error| error.to_string())?;
         let input = child.stdin.take().ok_or("Silero stdin is unavailable")?;
@@ -128,7 +141,8 @@ pub fn speak(text: &str) -> bool {
     }
 
     let tts_dir = APP_DIR.join("resources").join("tts");
-    let use_silero = selected_tts_mode() == "silero" && silero_speaker_command(&tts_dir, text).is_some();
+    let use_silero = (selected_tts_mode() == "silero" && silero_speaker_command(&tts_dir, text).is_some())
+        || (selected_tts_mode() == "xtts" && xtts_speaker_command(&tts_dir, text).is_some());
     let command = if use_silero { None } else { speaker_command(text) };
     if !use_silero && command.is_none() {
         warn!("No configured TTS speaker is available.");
@@ -164,7 +178,11 @@ fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize, Opti
         let (sender, receiver) = mpsc::channel::<(String, Option<Command>, usize, Option<PathBuf>)>();
         std::thread::spawn(move || {
             let tts_dir = APP_DIR.join("resources").join("tts");
-            let mut silero = if selected_tts_mode() == "silero" { SileroWorker::start(&tts_dir).ok() } else { None };
+            let (warm_sender, warm_receiver) = mpsc::channel();
+            let warm_dir = tts_dir.clone();
+            std::thread::spawn(move || { let _ = warm_sender.send(SileroWorker::start(&warm_dir).ok()); });
+            let mut warming = Some(warm_receiver);
+            let mut silero = None;
             for (spoken_text, command, generation, recording) in receiver {
                 if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
                     PENDING_SPEECH.fetch_sub(1, Ordering::SeqCst);
@@ -181,6 +199,7 @@ fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize, Opti
                         warn!("TTS process failed: {error}");
                     }
                 } else {
+                    if let Some(receiver) = warming.take() { silero = receiver.recv().ok().flatten(); }
                     if silero.is_none() { silero = SileroWorker::start(&tts_dir).ok(); }
                     if generation != SPEECH_GENERATION.load(Ordering::SeqCst) {
                         silero = None;
@@ -204,7 +223,7 @@ fn speech_queue() -> &'static mpsc::Sender<(String, Option<Command>, usize, Opti
                     } else if let Err(error) = result {
                         warn!("{error}; retrying on next reply");
                         silero = None;
-                        if let Some(fallback) = silero_speaker_command(&tts_dir, &spoken_text) {
+                        if let Some(fallback) = speaker_command(&spoken_text) {
                             if let Err(error) = run_speech_command(fallback, generation) {
                                 warn!("Silero one-shot fallback failed: {error}");
                             }
@@ -252,7 +271,6 @@ mod recording_queue_tests {
 }
 
 pub fn prewarm_silero() {
-    if selected_tts_mode() != "silero" { return; }
     let _ = speech_queue();
 }
 
@@ -325,12 +343,14 @@ fn xtts_speaker_command(tts_dir: &std::path::Path, text: &str) -> Option<Command
     let script = tts_dir.join("TrainedXttsSpeak.py");
     let run_name = fs::read_to_string(tts_dir.join("trained-checkpoint.txt")).ok()?;
     let run_name = run_name.trim();
-    if !run_name.starts_with("jarvis_xtts_pilot_") || run_name.contains(['/', '\\']) || run_name.contains("..") {
+    if run_name.contains(['/', '\\']) || run_name.contains("..") {
         return None;
     }
     let workspace = APP_DIR.parent()?.parent()?;
-    let run = workspace.join("tools").join("voice_training").join("xtts_pilot_output").join(run_name);
-    let checkpoint = run.join("best_model.pth");
+    let timed = run_name.chars().all(|c| c.is_ascii_digit() || c == '-');
+    if !timed && !run_name.starts_with("jarvis_xtts_pilot_") { return None; }
+    let run = workspace.join("tools").join("voice_training").join(if timed { "xtts_timed_runs" } else { "xtts_pilot_output" }).join(run_name);
+    let checkpoint = run.join(if timed { "final.pth" } else { "best_model.pth" });
     let config = run.join("config.json");
     let cache = PathBuf::from(std::env::var_os("LOCALAPPDATA")?)
         .join("tts").join("tts_models--multilingual--multi-dataset--xtts_v2");

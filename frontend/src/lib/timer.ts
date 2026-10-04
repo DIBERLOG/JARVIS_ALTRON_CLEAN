@@ -1,5 +1,6 @@
 import { get, writable } from "svelte/store"
 import { activeNotification } from "@/lib/ipc"
+import { sendAction } from '@/lib/ipc'
 
 export type TimerPreset = { id: string; label: string; seconds: number; icon: string; owner?: string }
 export type TimerState = { label: string; total: number; remaining: number; deadline: number | null; phase: "idle" | "running" | "paused" | "finished"; owner?: string }
@@ -40,11 +41,19 @@ export function tickTimer(now = Date.now()) {
     const state = get(timerState)
     if (state.phase !== "running" || state.deadline === null) return
     const remaining = Math.max(0, Math.ceil((state.deadline - now) / 1000))
+    if(get(timerSound)) {
+        for(const [seconds,message] of [[60,'До конца таймера осталась одна минута, сэр.'],[300,'До конца таймера осталось пять минут, сэр.']] as const) {
+            if(state.remaining > seconds && remaining <= seconds && remaining > 0) {
+                sendAction('center_reply',{text:message,reply_id:seconds===300?'timer_five_minutes':'timer_one_minute',follow_up:false})
+                break // A delayed tick must not produce several announcements at once.
+            }
+        }
+    }
     if (remaining > 0) { if (remaining !== state.remaining) timerState.set({ ...state, remaining }); return }
     timerState.set({ ...state, remaining: 0, deadline: null, phase: "finished" })
     persist()
     activeNotification.set({ id: Date.now(), title: "Таймер завершён", primary: state.label, detail: "Время вышло, сэр." })
-    if (get(timerSound)) playAlarm()
+    if (get(timerSound)) { playAlarm();sendAction('center_reply',{text:'Время вышло, сэр.',reply_id:'timer_finished',follow_up:false}) }
 }
 function prepareAudio() {
     try { audio ??= new AudioContext(); void audio.resume().catch(() => {}) } catch { /* Visual notification remains available. */ }

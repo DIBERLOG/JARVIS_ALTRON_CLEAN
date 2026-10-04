@@ -337,6 +337,9 @@ fn recognize_command(
     let mut silence_frames: u32 = 0;
     let mut start = SystemTime::now();
     let mut first_recognition = prefed_audio;
+    let mut pending_question = String::new();
+    let question_pause_frames = ((2.2 * sample_rate as f32) / frame_length as f32).ceil() as u32;
+    info!("Speech endpoint: {:.1}s pause tolerance; recognition segments are combined", 2.2);
     
     // longer silence threshold for commands (user might pause to think)
     // 5 seconds
@@ -380,7 +383,15 @@ fn recognize_command(
             
             VadState::VoiceActive => {
                 // feed to STT
-                if let Some(mut recognized_voice) = stt::recognize(frame_buffer, false) {
+                if let Some(part) = stt::recognize(frame_buffer, false) {
+                    if !part.trim().is_empty() {
+                        if !pending_question.is_empty() { pending_question.push(' '); }
+                        pending_question.push_str(part.trim());
+                    }
+                }
+                let ready = !processed.is_voice && silence_frames >= question_pause_frames;
+                if ready && !pending_question.is_empty() {
+                    let mut recognized_voice = std::mem::take(&mut pending_question);
                     info!("Recognized voice: {}", recognized_voice);
                     
                     ipc::send(IpcEvent::SpeechRecognized {
@@ -438,7 +449,7 @@ fn recognize_command(
                     
                     recognized_voice = remove_assistant_phrases(recognized_voice);
                     
-                    if recognized_voice.len() < 5 {
+                    if recognized_voice.len() < 5 && !center_pending() {
                         debug!("Ignoring too short recognition: '{}'", recognized_voice);
                         continue;
                     }
@@ -455,6 +466,7 @@ fn recognize_command(
                 // track silence
                 if processed.is_voice {
                     silence_frames = 0;
+                    start = SystemTime::now();
                 } else {
                     silence_frames += 1;
                     
@@ -477,6 +489,29 @@ fn recognize_command(
 }
 
 
+pub static CENTER_PENDING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static CENTER_DEADLINE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+fn center_time() -> u64 {std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()}
+fn center_pending() -> bool {
+    if center_time()>CENTER_DEADLINE.load(Ordering::SeqCst) {CENTER_PENDING.store(false,Ordering::SeqCst);}
+    CENTER_PENDING.load(Ordering::SeqCst)
+}
+pub fn center_reply(text: String, reply_id: String, follow_up: bool) {
+    let timer_warning = matches!(reply_id.as_str(), "timer_warning" | "timer_five_minutes" | "timer_one_minute" | "timer_finished");
+    if timer_warning && (CENTER_PENDING.load(Ordering::SeqCst) || playback_active()) { return; }
+    if !timer_warning { CENTER_DEADLINE.store(center_time()+90,Ordering::SeqCst);CENTER_PENDING.store(follow_up, Ordering::SeqCst); }
+    let language = i18n::get_language();
+    if reply_id.is_empty() || !voices::play_command_reply(&reply_id, &language) { tts::speak(&text); }
+    if !timer_warning { CHAIN_LISTENING.store(follow_up, Ordering::SeqCst); }
+}
+fn center_phrase(text: &str) -> bool {
+    if jarvis_core::commands::center::matches_phrase(text) { return true; }
+    let actionable=["откр","покаж","запуст","созда","добав","перев","отмет","сброс","приостан","пауз","продолж","возобнов","запи","допол","обнов","останов","выключ","начни","заверш","установ","измени"].iter().any(|word|text.contains(word));
+    if !actionable && !["центр","календарь","заметки","привычки","таймер","мои параметры","расписание на сегодня"].contains(&text)
+        && !text.starts_with("погода на") && !text.starts_with("прогноз на") && !text.starts_with("мой вес") {return false;}
+    ["центр", "календар", "заметк", "чек-лист", "чек лист", "диктовк", "таймер", "пресет", "напоминан", "день рождения", "дни рождения", "привычк", "трениров", "зарядк", "мои параметры", "статистик", "хранилищ", "живые логи", "историю запросов", "история запросов", "голос в текст", "пароли", "город для прогноза", "озвучк", "погода на", "прогноз на", "запиши вес", "мой вес", "измерение", "расписание на сегодня"].iter().any(|word| text.contains(word))
+        || ((text.contains("новост") || text.contains("лент")) && ["откр", "перев", "обнов"].iter().any(|verb| text.contains(verb)))
+}
 fn playback_active() -> bool { tts::is_speaking() || jarvis_core::audio::is_playing() }
 
 fn process_text_command(text: &str, dispatcher: &CommandDispatcher) {
@@ -501,6 +536,16 @@ fn process_text_command(text: &str, dispatcher: &CommandDispatcher) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
+    if text == "отмена" || text == "отмени" {
+        CENTER_PENDING.store(false, Ordering::SeqCst);
+        ipc::send(IpcEvent::CenterCommand { text: "отмена".into() });
+        return false;
+    }
+    if (center_pending() && CENTER_PENDING.swap(false, Ordering::SeqCst)) || center_phrase(text) {
+        if ipc::has_clients() { ipc::send(IpcEvent::CenterCommand { text: text.into() }); }
+        else { center_reply("Откройте окно JARVIS, сэр. Центр сейчас не подключён.".into(), "voice_center_unavailable".into(), false); }
+        return true;
+    }
     let language = i18n::get_language();
     if dialogue_start_phrase(text) {
         DIALOGUE_MODE.store(true, Ordering::SeqCst);
@@ -544,15 +589,16 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
         None
     };
     if in_dialogue && dialogue_command.is_none() {
+        let response_started = std::time::Instant::now();
         let history = DIALOGUE_HISTORY.lock().map(|saved| saved.clone()).unwrap_or_default();
-        match jarvis_core::chat::ask_with_history(text, &history) {
+        match jarvis_core::chat::ask_spoken(text, &history) {
             Ok(answer) => {
+                info!("Voice latency: chat response queued after {} ms", response_started.elapsed().as_millis());
                 if let Ok(mut saved) = DIALOGUE_HISTORY.lock() {
                     saved.push((text.to_string(), answer.clone()));
                     let excess = saved.len().saturating_sub(8);
                     if excess > 0 { saved.drain(..excess); }
                 }
-                tts::speak(&answer);
                 return true;
             }
             Err(error) => {

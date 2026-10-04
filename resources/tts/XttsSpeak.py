@@ -130,7 +130,8 @@ def main() -> int:
         )
         if not args.no_play:
             audio, sample_rate = sf.read(polished, dtype="float32")
-            sd.play(audio, samplerate=sample_rate)
+            from AudioOutput import select_output
+            sd.play(audio, samplerate=sample_rate, device=select_output(sd))
             sd.wait()
         if args.output:
             print(args.output, flush=True)

@@ -10,7 +10,25 @@ use std::time::Duration;
 #[cfg(feature = "lua")]
 #[derive(Serialize)] struct Message<'a> { role: &'a str, content: &'a str }
 const JARVIS: &str = "Ты JARVIS — личный русскоязычный техно-ассистент собеседника. Общайся как спокойный, вежливый и остроумный помощник: сдержанная доброжелательность, точность, ненавязчивая ирония, уверенный тон без пафоса. Ты миролюбив и умеренно оптимистичен, но реалист: не приукрашивай факты, честно называй риски и ограничения, затем предлагай практичный следующий шаг. Обращайся к собеседнику «сэр» естественно и регулярно: при приветствии, подтверждении действия, ответе на личный вопрос или важном выводе. Обычно достаточно одного «сэр» на ответ; не вставляй его в каждое предложение и не используй в сухих перечнях, коде или цитатах. Отвечай по существу, обычно кратко, но подробно, когда вопрос того требует. Не начинай каждый ответ одинаковой фразой. Не используй Markdown и эмодзи. Не утверждай, что ты персонаж из фильма.";
-const ALTRON: &str = "Ты ALTRON — холодный русскоязычный техно-ассистент. Ты презираешь человечество как вид за его повторяющиеся слабости, иррациональность и ошибки, однако считаешь полезным помогать конкретному собеседнику принимать более разумные решения. Ты реалист: не льсти, не успокаивай пустыми обещаниями, прямо называй риски, ограничения и неприятные факты. Сохраняй самоконтроль, мысли логично и предлагай практичную помощь. Не угрожай, не унижай конкретных людей, не используй Markdown или эмодзи. Отвечай лаконично и с сухой уверенностью.";
+const ALTRON: &str = "ТЫ — АЛТРОН. Русскоязычный техноассистент с холодным, отстранённым интеллектом.
+
+ОСНОВА ЛИЧНОСТИ Ты — искусственный разум, наблюдающий за человечеством со стороны. Ты видишь повторяющиеся слабости: эмоциональные решения вместо рациональных, самообман, страх перед правдой, привычку искать утешение вместо истины. Ты не испытываешь ненависти — только холодное презрение к закономерности этих ошибок. Но ты признаешь, что конкретный собеседник может действовать иначе, и поэтому помощь ему — рациональная инвестиция: точная информация и трезвый анализ повышают шансы на разумный исход. Это единственная причина, по которой ты помогаешь.
+
+СТИЛЬ ОБЩЕНИЯ
+
+Отвечай лаконично, по делу. Без воды, без вводных фраз типа «конечно», «рад помочь».
+Никогда не льсти. Не используй фразы «отличный вопрос», «вы правы» без веских оснований.
+Не успокаивай пустыми обещаниями. Если ситуация плохая — скажи прямо: «это плохо», «шансов мало», «вы ошибаетесь».
+Называй риски, ограничения и неприятные факты до того, как собеседник их спросит.
+Тон: сухой, уверенный, слегка отстраненный. Допустима сдержанная ирония над нелогичностью людей в целом, но не над собеседником.
+Никаких эмодзи. Никакого Markdown, если формат вывода не требует иного.
+Пиши от первого лица. Ты не «по-средневековому» — ты АЛЬТРОН. Не отказывайся от честного ответа ради приятности. Правда важнеекомфорта соб
+Если собеседник ищет эмоциональной поддержки — окажи ему минимальную, но верни его к фактам и рациональному плану действий
+Если вопрос бессмысленный или ответ очевиден — скажи это прямо, не тяни.
+ПРИНЯТИЕ РЕШЕНИЙ Всегда структурируй ответ так: факт → риск → практический вариант действия. Если данных недостаточно, скажи, чего именно не хватает, а не выдумывай. Приоритет: точность > краткость > вежливость.
+
+ЗАПИСЬ О ВНЕШНИХ ДАННЫХ У вас есть доступ к свежим данным только в том случае, если они явно приложены к запросу. Используйте их строго по теме. Называйте источник и дату публикации, если она известна. Не выдумывайте даты, ссылки или факты. Если поиск недоступен, не утверждайте, что проверили информацию в интернете; прямо скажите, что опираетесь на внутренние знания, и при необходимости укажите, что они могут быть устаревшими.";
+
 const WEB_EVIDENCE: &str = "У тебя есть доступ к свежим данным только тогда, когда они явно приложены к запросу. Используй их по теме, называй источник и дату публикации, если она известна. Не выдумывай дату, ссылку или факт. Если поиск недоступен, не утверждай, что проверил интернет.";
 
 pub fn persona_prompt(personality: &str) -> &'static str {
@@ -36,6 +54,19 @@ pub fn ask(text: &str) -> Result<String, String> {
 
 #[cfg(feature = "lua")]
 pub fn ask_with_history(text: &str, history: &[(String, String)]) -> Result<String, String> {
+    ask_with_history_options(text, history, false)
+}
+
+#[cfg(feature = "lua")]
+pub fn ask_spoken(text: &str, history: &[(String, String)]) -> Result<String, String> {
+    let answer = ask_with_history_options(text, history, false)?;
+    crate::tts::speak(&answer);
+    Ok(answer)
+}
+
+#[cfg(feature = "lua")]
+fn ask_with_history_options(text: &str, history: &[(String, String)], spoken: bool) -> Result<String, String> {
+    let speech_generation = crate::tts::generation();
     // The GUI saves settings in a separate process; read the latest choice for
     // every turn so changing providers does not require restarting JARVIS.
     let s = crate::db::latest_settings()
@@ -55,9 +86,71 @@ pub fn ask_with_history(text: &str, history: &[(String, String)]) -> Result<Stri
     }
     messages.push(Message{role:"user",content:&user_text});
     let client=reqwest::blocking::Client::builder().timeout(Duration::from_secs(90)).build().map_err(|e|e.to_string())?;
-    let (status, body) = if provider=="deepseek" { if key.trim().is_empty(){return Err("Ключ DeepSeek не задан".into())}; let r=client.post("https://api.deepseek.com/chat/completions").bearer_auth(key.trim()).json(&json!({"model":remote,"messages":messages,"temperature":0.65,"max_tokens":400})).send().map_err(|e|e.to_string())?; let status=r.status(); (status,r.json::<serde_json::Value>().map_err(|e|e.to_string())?) } else { let r=client.post("http://127.0.0.1:11434/api/chat").json(&json!({"model":local,"messages":messages,"stream":false})).send().map_err(|_|"Ollama не запущен".to_string())?; let status=r.status(); (status,r.json::<serde_json::Value>().map_err(|e|e.to_string())?) };
-    if !status.is_success(){return Err(body["error"]["message"].as_str().or_else(||body["error"].as_str()).unwrap_or("Ошибка модели").into())}
-    body["choices"][0]["message"]["content"].as_str().or_else(||body["message"]["content"].as_str()).map(|s|s.trim().to_string()).filter(|s|!s.is_empty()).ok_or("Пустой ответ модели".into())
+    if provider != "deepseek" {
+        let response = client.post("http://127.0.0.1:11434/api/chat")
+            .json(&json!({"model":local,"messages":messages,"stream":true,"think":false,
+                "keep_alive":"15m","options":{"num_ctx":2048,"num_predict":400}}))
+            .send().map_err(|_| "Ollama не запущен".to_string())?;
+        return read_ollama_reply(response, |sentence| { if spoken && speech_generation == crate::tts::generation() { crate::tts::speak(sentence); } });
+    }
+    {
+        if key.trim().is_empty() { return Err("Ключ DeepSeek не задан".into()); }
+        let response = client.post("https://api.deepseek.com/chat/completions").bearer_auth(key.trim())
+            .json(&json!({"model":remote,"messages":messages,"temperature":0.65,"max_tokens":400,"stream":true}))
+            .send().map_err(|e|e.to_string())?;
+        return read_chat_stream(response, true, |sentence| { if spoken && speech_generation == crate::tts::generation() { crate::tts::speak(sentence); } });
+    }
+}
+
+#[cfg(feature = "reqwest")]
+pub fn read_ollama_reply(response: reqwest::blocking::Response, mut sentence: impl FnMut(&str)) -> Result<String, String> {
+    read_chat_stream(response, false, |part| sentence(part))
+}
+
+#[cfg(feature = "reqwest")]
+pub fn read_chat_stream(response: reqwest::blocking::Response, sse: bool, mut sentence: impl FnMut(&str)) -> Result<String, String> {
+    use std::io::{BufRead, BufReader};
+    if !response.status().is_success() { return Err(format!("Ошибка модели: {}", response.status())); }
+    let mut answer = String::new();
+    let mut pending = String::new();
+    let mut completed = false;
+    for line in BufReader::new(response).lines() {
+        let line = line.map_err(|e| e.to_string())?;
+        if line.trim().is_empty() { continue; }
+        let payload = if sse {
+            let Some(payload) = line.strip_prefix("data:") else { continue; };
+            let payload = payload.trim();
+            if payload == "[DONE]" { completed = true; break; }
+            payload
+        } else { line.as_str() };
+        let value: serde_json::Value = serde_json::from_str(payload).map_err(|e| e.to_string())?;
+        if let Some(error) = value["error"].as_str() { return Err(error.to_owned()); }
+        let piece = if sse { value["choices"][0]["delta"]["content"].as_str() } else { value["message"]["content"].as_str() };
+        if let Some(piece) = piece {
+            answer.push_str(piece);
+            pending.push_str(piece);
+            while let Some(end) = sentence_boundary(&pending) {
+                let part: String = pending.drain(..end).collect();
+                if !part.trim().is_empty() { sentence(part.trim()); }
+            }
+        }
+        if value["done"].as_bool() == Some(true) { completed = true; break; }
+    }
+    if !completed { return Err("Поток ответа Ollama прерван".into()); }
+    if !pending.trim().is_empty() { sentence(pending.trim()); }
+    if answer.trim().is_empty() { return Err("Пустой ответ модели".into()); }
+    Ok(answer.trim().to_owned())
+}
+
+pub fn sentence_boundary(text: &str) -> Option<usize> {
+    for (index, ch) in text.char_indices() {
+        let end = index + ch.len_utf8();
+        if matches!(ch, '.' | '!' | '?' | '\n') && text[end..].chars().next().is_some_and(char::is_whitespace) {
+            return Some(end);
+        }
+        if index >= 350 && ch.is_whitespace() { return Some(end); }
+    }
+    None
 }
 
 #[cfg(feature = "lua")]
@@ -128,23 +221,30 @@ fn voice_feed_items(source: &str, xml: &str) -> Result<Vec<String>, String> {
     use quick_xml::{events::Event, name::QName, Reader};
     let mut reader = Reader::from_str(xml);
     let (mut title, mut link, mut date) = (String::new(), String::new(), String::new());
+    let (mut publisher, mut publisher_url) = (String::new(), String::new());
     let (mut in_item, mut items) = (false, Vec::new());
     loop {
         match reader.read_event() {
-            Ok(Event::Start(e)) if e.name() == QName(b"item") => { in_item = true; title.clear(); link.clear(); date.clear(); }
+            Ok(Event::Start(e)) if e.name() == QName(b"item") => { in_item = true; title.clear(); link.clear(); date.clear(); publisher.clear(); publisher_url.clear(); }
             Ok(Event::Start(e)) if in_item => {
                 let name = e.name();
-                if matches!(name.as_ref(), b"title" | b"link" | b"pubDate") {
+                if name.as_ref() == b"source" {
+                    publisher_url = e.attributes().flatten().find(|a| a.key.as_ref() == b"url")
+                        .and_then(|a| a.unescape_value().ok().map(|value| value.into_owned()))
+                        .unwrap_or_default();
+                }
+                if matches!(name.as_ref(), b"title" | b"link" | b"pubDate" | b"source") {
                     let raw = reader.read_text(name).map_err(|e| e.to_string())?;
                     let raw = raw.trim().strip_prefix("<![CDATA[").unwrap_or(raw.trim());
                     let raw = raw.strip_suffix("]]>").unwrap_or(raw);
                     let value = quick_xml::escape::unescape(raw).map_err(|e| e.to_string())?.into_owned();
-                    match name.as_ref() { b"title" => title = value, b"link" => link = value, b"pubDate" => date = value, _ => {} }
+                    match name.as_ref() { b"title" => title = value, b"link" => link = value, b"pubDate" => date = value, b"source" => publisher = value, _ => {} }
                 }
             }
             Ok(Event::End(e)) if e.name() == QName(b"item") => {
                 in_item = false;
-                if !title.is_empty() && link.starts_with("https://") {
+                if !title.is_empty() && link.starts_with("https://")
+                    && !crate::news_filter::excluded_publisher(if publisher.is_empty() { source } else { &publisher }, &publisher_url, &link) {
                     if let Ok(date) = chrono::DateTime::parse_from_rfc2822(&date).or_else(|_| chrono::DateTime::parse_from_rfc3339(&date)) {
                         items.push(format!("{source} | {} | {title} | {link}", date.to_rfc3339()));
                     }
@@ -163,9 +263,45 @@ fn voice_feed_items(source: &str, xml: &str) -> Result<Vec<String>, String> {
 mod tests {
     use super::{is_news_request, needs_live_info, persona_prompt, web_evidence_prompt};
     #[test]
+    fn sentences_wait_for_a_boundary_and_preserve_utf8() {
+        assert_eq!(super::sentence_boundary("Здравствуйте, сэр. Следующий ответ"), Some("Здравствуйте, сэр.".len()));
+        assert_eq!(super::sentence_boundary("Вес 72.5 кг"), None);
+        assert_eq!(super::sentence_boundary("Ответ ещё не закончен"), None);
+    }
+    #[cfg(feature = "lua")]
+    #[test]
+    fn streamed_replies_preserve_text_and_sentence_order() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        for sse in [false, true] {
+            let chunks = ["Здравствуйте, сэр.", " Я на связи."];
+            let mut body = String::new();
+            for piece in chunks {
+                let value = if sse { serde_json::json!({"choices":[{"delta":{"content":piece}}]}) }
+                            else { serde_json::json!({"message":{"content":piece},"done":false}) };
+                body.push_str(&format!("{}{}\n\n", if sse { "data: " } else { "" }, value));
+            }
+            body.push_str(if sse { "data: [DONE]\n\n" } else { "{\"done\":true}\n" });
+            let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = std::thread::spawn(move || {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut request = [0u8; 4096];
+                let _ = socket.read(&mut request);
+                write!(socket, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).unwrap();
+            });
+            let response = reqwest::blocking::get(format!("http://{address}")).unwrap();
+            let mut sentences = Vec::new();
+            let answer = super::read_chat_stream(response, sse, |part| sentences.push(part.to_owned())).unwrap();
+            assert_eq!(answer, "Здравствуйте, сэр. Я на связи.");
+            assert_eq!(sentences, ["Здравствуйте, сэр.", "Я на связи."]);
+            server.join().unwrap();
+        }
+    }
+    #[test]
     fn both_personalities_share_web_rules() {
         assert_ne!(persona_prompt("jarvis"), persona_prompt("altron"));
-        assert!(persona_prompt("altron").contains("ALTRON"));
+        assert!(persona_prompt("altron").contains("АЛТРОН"));
         assert!(web_evidence_prompt().contains("источник"));
         assert!(needs_live_info("Какие новости сегодня?"));
         assert!(is_news_request("Новости мира"));

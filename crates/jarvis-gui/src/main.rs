@@ -7,6 +7,7 @@ use jarvis_core::{config, db, i18n, voices, DB, SettingsManager};
 extern crate simple_log;
 
 mod events;
+mod ollama;
 
 mod tauri_commands;
 mod window_motion;
@@ -25,6 +26,7 @@ fn main() {
 
     // init settings
     let manager = db::init();
+    ollama::start_in_background();
     jarvis_core::tts::prewarm_silero();
 
     // init i18n
@@ -109,7 +111,7 @@ fn main() {
             tauri_commands::list_vosk_models,
             tauri_commands::center_transcribe_audio,
             tauri_commands::center_punctuate_text,
-            tauri_commands::set_jarvis_terminal_visible,
+            tauri_commands::get_jarvis_terminal_log,
             tauri_commands::password_vault_load,
             tauri_commands::password_vault_save,
 

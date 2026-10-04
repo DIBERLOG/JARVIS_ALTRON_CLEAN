@@ -69,8 +69,14 @@ tree.txt
 /tools/voice_training/dataset_xtts_pilot*/
 /tools/voice_training/xtts_pilot_assets/
 /tools/voice_training/xtts_pilot_output/
+/tools/voice_training/xtts_timed_runs/
 /tools/voice_training/jarvis_xtts_pilot_*.wav
 **/__pycache__/
+/tools/voice_studio/.venv/
+/tools/voice_studio/build/
+/tools/voice_studio/dist/
+/tools/voice_studio/runtime/
+/tools/voice_studio/*.spec
 /tools/voice_training/dataset_current/
 /tools/voice_training/*.wav
 /tools/voice_training/transcripts_*.jsonl

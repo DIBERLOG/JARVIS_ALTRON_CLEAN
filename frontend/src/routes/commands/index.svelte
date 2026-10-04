@@ -33,10 +33,12 @@
         { id: "dialogue", label: "Общение с Jarvis", icon: "◌" },
         { id: "system", label: "Система и управление", icon: "⚙" },
         { id: "other", label: "Другие команды", icon: "◇" },
+        { id: "center", label: "Личный центр", icon: "◈" },
     ]
     let collapsed = new Set<string>()
     function categoryFor(command: JarvisCommand) {
         const id = command.id
+        if (id.startsWith("center_")) return categories[7]
         if (/^(weather|set_city)$/.test(id)) return categories[2]
         if (id.startsWith("counter")) return categories[3]
         if (/^(jarvis_restart|computer_restart|repeat_command)$/.test(id)) return categories[5]

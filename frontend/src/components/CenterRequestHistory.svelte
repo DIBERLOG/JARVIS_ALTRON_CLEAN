@@ -1,10 +1,8 @@
 <script lang="ts">
     import {requestHistory,clearRequestHistory} from '@/lib/requestHistory'
-    import {invoke} from '@tauri-apps/api/core'
+    import LiveTerminal from './LiveTerminal.svelte'
     import {requestStats} from '@/lib/requestStats'
     let query='',source='all',visible=50
-    let terminalError='',terminalBusy=false
-    async function terminal(show:boolean){terminalBusy=true;terminalError='';try{await invoke('set_jarvis_terminal_visible',{visible:show})}catch(e){terminalError=String(e)}finally{terminalBusy=false}}
     $: filtered=$requestHistory.filter(item=>(source==='all'||item.source===source)&&item.text.toLocaleLowerCase('ru-RU').includes(query.toLocaleLowerCase('ru-RU')))
     $: {query;source;visible=50}
     $: chatCount=filtered.filter(item=>item.source==='chat').length
@@ -17,8 +15,7 @@
 <section class="history" aria-label="История запросов">
     <header><div><p>JARVIS / REQUEST LOG</p><h2>История запросов</h2><small>Последние 500 запросов · хранится на этом компьютере</small></div><button disabled={!$requestHistory.length} on:click={()=>{if(confirm('Удалить всю историю запросов?'))clearRequestHistory()}}>Очистить историю</button></header>
     <div class="categories" aria-label="Категории истории">{#each [{id:'all',name:'Все запросы'},{id:'chat',name:'История чата'},{id:'voice',name:'Голосовые команды'}] as category}<button aria-pressed={source===category.id} on:click={()=>source=category.id}>{category.name}</button>{/each}</div>
-    <div class="terminal"><span>Терминал JARVIS</span><button disabled={terminalBusy} on:click={()=>terminal(false)}>Скрыть терминал</button><button disabled={terminalBusy} on:click={()=>terminal(true)}>Открыть терминал</button></div>
-    {#if terminalError}<p role="alert">{terminalError}</p>{/if}
+    <LiveTerminal />
     <div class="filters"><input aria-label="Поиск по истории запросов" placeholder="Найти запрос…" bind:value={query}/></div>
     <div class="charts"><section><h3>Запросы по источникам</h3><small>Выбранная категория и поиск · {filtered.length} записей</small><div class="mix"><div class="donut" role="img" aria-label={`Чат: ${chatCount}, голос: ${voiceCount}`} style:background={filtered.length?`conic-gradient(#60f3e9 ${chatShare}%, #9ba9ff 0)`:'#28494f'}><strong>{filtered.length}</strong></div><div><p>● Чат <b>{chatCount}</b></p><p>◇ Голос <b>{voiceCount}</b></p></div></div></section><section><h3>Активность за 14 дней</h3><small>Количество записанных запросов в день · от нуля</small><div class="bars" role="img" aria-label={days.map(day=>`${day.label}: ${day.count}`).join('; ')}>{#each days as day}<div title={`${day.label}: ${day.count}`}><b>{day.count}</b><span style:height={`${day.count/maxDay*100}px`}></span><small>{day.label}</small></div>{/each}</div></section></div>
     <div class="charts extra-charts">

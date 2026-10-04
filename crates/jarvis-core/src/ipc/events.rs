@@ -12,6 +12,7 @@ pub enum IpcEvent {
     
     // Speech recognized
     SpeechRecognized { text: String },
+    CenterCommand { text: String },
     
     // Command was executed
     CommandExecuted { id: String, success: bool },
@@ -59,4 +60,5 @@ pub enum IpcAction {
 
     // Execute text command
     TextCommand { text: String },
+    CenterReply { text: String, reply_id: String, follow_up: bool },
 }

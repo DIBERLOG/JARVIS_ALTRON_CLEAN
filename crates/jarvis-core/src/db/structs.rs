@@ -44,6 +44,8 @@ pub struct Settings {
     pub chat_speak_responses: bool,
     #[serde(default = "default_tts_mode")]
     pub tts_mode: String,
+    #[serde(default = "default_audio_output_mode")]
+    pub audio_output_mode: String,
     #[serde(default)]
     pub monitor_self: bool,
     #[serde(default = "default_personality")]
@@ -67,6 +69,7 @@ fn default_local_chat_model() -> String { "qwen3:8b".to_string() }
 fn default_deepseek_chat_model() -> String { "deepseek-flash".to_string() }
 fn default_chat_speak_responses() -> bool { true }
 fn default_tts_mode() -> String { "xtts".to_string() }
+fn default_audio_output_mode() -> String { "direct".to_string() }
 fn default_personality() -> String { "jarvis".to_string() }
 fn default_voice_dialogue_personality() -> String { "jarvis".to_string() }
 
@@ -94,6 +97,7 @@ impl Settings {
             "deepseek_chat_model"       => Some(self.deepseek_chat_model.clone()),
             "chat_speak_responses"      => Some(self.chat_speak_responses.to_string()),
             "tts_mode"                  => Some(self.tts_mode.clone()),
+            "audio_output_mode"         => Some(self.audio_output_mode.clone()),
             "monitor_self"              => Some(self.monitor_self.to_string()),
             "assistant_personality"      => Some(self.personality.clone()),
             "voice_dialogue_personality" => Some(self.voice_dialogue_personality.clone()),
@@ -170,6 +174,7 @@ impl Settings {
             "chat_speak_responses" => self.chat_speak_responses = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
             "tts_mode" => { if val != "silero" && val != "xtts" { return Err("tts mode must be silero or xtts".into()) }; self.tts_mode = val.to_string(); }
             "monitor_self" => self.monitor_self = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
+            "audio_output_mode" => { if !matches!(val,"direct"|"voicemod") { return Err("unsupported audio output mode".into()) }; self.audio_output_mode=val.into(); },
             "assistant_personality" => { if val != "jarvis" && val != "altron" { return Err("personality must be jarvis or altron".into()) }; self.personality = val.to_string(); }
             "voice_dialogue_personality" => { if val != "jarvis" && val != "altron" { return Err("voice dialogue personality must be jarvis or altron".into()) }; self.voice_dialogue_personality = val.to_string(); }
             "center_data" => {
@@ -216,6 +221,7 @@ impl Settings {
             "deepseek_chat_model",
             "chat_speak_responses",
             "tts_mode",
+            "audio_output_mode",
             "monitor_self",
             "assistant_personality",
             "voice_dialogue_personality",
@@ -256,6 +262,7 @@ impl Default for Settings {
             deepseek_chat_model: default_deepseek_chat_model(),
             chat_speak_responses: default_chat_speak_responses(),
             tts_mode: default_tts_mode(),
+            audio_output_mode: default_audio_output_mode(),
             monitor_self: false,
             personality: default_personality(),
             voice_dialogue_personality: default_voice_dialogue_personality(),
@@ -282,6 +289,18 @@ pub struct ApiKeys {
 #[cfg(test)]
 mod tts_mode_tests {
     use super::Settings;
+
+    #[test]
+    fn audio_route_defaults_to_direct_and_validates_saved_values() {
+        let mut value=serde_json::to_value(Settings::default()).unwrap();
+        value.as_object_mut().unwrap().remove("audio_output_mode");
+        let mut settings:Settings=serde_json::from_value(value).unwrap();
+        assert_eq!(settings.get("audio_output_mode").as_deref(),Some("direct"));
+        settings.set("audio_output_mode","voicemod").unwrap();
+        let restored:Settings=serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert_eq!(restored.get("audio_output_mode").as_deref(),Some("voicemod"));
+        assert!(settings.set("audio_output_mode","unknown").is_err());
+    }
 
     #[test]
     fn old_settings_default_to_xtts() {

@@ -14,6 +14,7 @@ use kira::{
 
 static MANAGER: OnceCell<Mutex<AudioManager>> = OnceCell::new();
 static PLAYING: Mutex<Vec<StaticSoundHandle>> = Mutex::new(Vec::new());
+static OUTPUT_MODE: Mutex<String> = Mutex::new(String::new());
 
 pub fn stop() {
     if let Ok(mut playing) = PLAYING.lock() {
@@ -30,15 +31,35 @@ pub fn is_playing() -> bool {
 }
 
 pub fn init() -> Result<(), ()> {
-    if MANAGER.get().is_some() {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let mode=crate::db::latest_settings().map(|s|s.audio_output_mode).unwrap_or_else(||"direct".into());
+    let mut current=OUTPUT_MODE.lock().map_err(|_|())?;
+    if MANAGER.get().is_some() && *current==mode {
         return Ok(());
     }  // already initialized
+    let host=cpal::default_host();
+    let virtual_device=|name:&str| {let name=name.to_lowercase();["cable","voicemod","virtual"].iter().any(|word|name.contains(word))};
+    let device=if mode=="voicemod" {
+        host.output_devices().ok().and_then(|mut devices|devices.find(|d|d.name().is_ok_and(|n|n.to_lowercase().contains("cable input"))))
+    } else {
+        host.default_output_device().filter(|d|d.name().is_ok_and(|n|!virtual_device(&n))).or_else(|| {
+            let devices:Vec<_>=host.output_devices().ok()?.filter(|d|d.name().is_ok_and(|n|!virtual_device(&n))).collect();
+            for word in ["jbl","headphone","наушник","speaker","динамик"] {
+                if let Some(device)=devices.iter().find(|d|d.name().is_ok_and(|n|n.to_lowercase().contains(word))) {return Some(device.clone())}
+            }
+            devices.into_iter().next()
+        })
+    };
+    let Some(device)=device else {warn!("No audio output available for mode {mode}");return Err(())};
+    info!("JARVIS output ({mode}): {}",device.name().unwrap_or_default());
+    let settings=AudioManagerSettings {backend_settings:kira::backend::cpal::CpalBackendSettings {device:Some(device),..Default::default()},..Default::default()};
 
     // Create an audio manager. This plays sounds and manages resources.
-    match AudioManager::<DefaultBackend>::new(AudioManagerSettings::default()) {
+    match AudioManager::<DefaultBackend>::new(settings) {
         Ok(manager) => {
             // store
-            MANAGER.set(Mutex::new(manager)).ok();
+            if let Some(existing)=MANAGER.get() {*existing.lock().map_err(|_|())?=manager;} else {MANAGER.set(Mutex::new(manager)).ok();}
+            *current=mode;
 
             // success
             Ok(())
@@ -54,6 +75,7 @@ pub fn init() -> Result<(), ()> {
 
 // @TODO. Cache sounds in memory? With a pool of a certain size, for instance.
 pub fn play_sound(filename: &PathBuf) {
+    if init().is_err() {return;}
     // load the file
     match StaticSoundData::from_file(filename) {
         Ok(sound_data) => {
@@ -82,6 +104,7 @@ pub fn play_sound_blocking(filename: &PathBuf) -> bool {
 }
 
 pub fn play_sound_cancellable(filename: &PathBuf, cancelled: impl Fn() -> bool) -> bool {
+    if init().is_err() {return false;}
     let sound_data = match StaticSoundData::from_file(filename) {
         Ok(data) => data,
         Err(err) => {

@@ -87,6 +87,7 @@
     let gainNormalizerEnabled = false
     let voiceDialoguePersonality = "jarvis"
     let ttsMode = "xtts"
+    let audioOutputMode = "direct"
     let monitorSelf = false
     let apiKeyPicovoice = ""
     let apiKeyOpenai = ""
@@ -125,6 +126,7 @@
                 { key: "api_key__picovoice", val: apiKeyPicovoice },
                 { key: "api_key__openai", val: apiKeyOpenai },
                 { key: "tts_mode", val: ttsMode },
+                { key: "audio_output_mode", val: audioOutputMode },
                 { key: "monitor_self", val: String(monitorSelf) }
             ] })
 
@@ -226,6 +228,7 @@
             voiceDialoguePersonality = dialoguePersonality === "altron" ? "altron" : "jarvis"
             ttsMode = savedTtsMode === "xtts" ? "xtts" : "silero"
             monitorSelf = savedMonitorSelf === "true"
+            audioOutputMode = await invoke<string>("db_read", { key: "audio_output_mode" }) === "voicemod" ? "voicemod" : "direct"
             apiKeyPicovoice = pico
             apiKeyOpenai = openai
         } catch (err) {
@@ -304,12 +307,18 @@
             <p>Выбор для чата, диалога и других ответов, созданных на лету. Готовые звуки команд не меняются.</p>
             <div class="tts-mode-options">
                 <button type="button" class:active={ttsMode === "xtts"} on:click={() => ttsMode = "xtts"} aria-pressed={ttsMode === "xtts"}>
-                    <strong>Обученный голос XTTS</strong><span>Выбранный тобой пробный голос. Звук идёт сразу в наушники, без Voicemod. Для работы нужна локально сохранённая модель.</span>
+                    <strong>Обученный голос XTTS</strong><span>Выбранный тобой пробный голос. Для работы нужна локально сохранённая модель.</span>
                 </button>
                 <button type="button" class:active={ttsMode === "silero"} on:click={() => ttsMode = "silero"} aria-pressed={ttsMode === "silero"}>
-                    <strong>Silero + Voicemod</strong><span>Звук идёт через виртуальный кабель. Пресет Evil AI выбери в Voicemod.</span>
+                    <strong>Silero</strong><span>Локальная озвучка. Работает напрямую или через Voicemod — выбери вывод ниже.</span>
                 </button>
             </div>
+            <h3>Куда выводить голос JARVIS</h3>
+            <div class="tts-mode-options">
+                <button type="button" class:active={audioOutputMode === "direct"} aria-pressed={audioOutputMode === "direct"} on:click={()=>audioOutputMode="direct"}><strong>Напрямую в наушники</strong><span>Без Voicemod и виртуальных кабелей. Используются физические наушники или динамики.</span></button>
+                <button type="button" class:active={audioOutputMode === "voicemod"} aria-pressed={audioOutputMode === "voicemod"} on:click={()=>audioOutputMode="voicemod"}><strong>Через Voicemod</strong><span>Вывод в CABLE Input. Требуются запущенный Voicemod и настроенный виртуальный кабель.</span></button>
+            </div>
+            <p>Выбор применяется после сохранения настроек к озвучке и готовым ответам команд. Настройки звука Windows не меняются.</p>
             <label class="monitor-self-option">
                 <input type="checkbox" bind:checked={monitorSelf} />
                 <span><strong>Слышать себя в наушниках</strong><small>Отдельное прослушивание обычного микрофона. Не влияет на звук Jarvis через VB-CABLE и Voicemod. Выключено по умолчанию.</small></span>

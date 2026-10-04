@@ -168,26 +168,24 @@ fn send_chat(state: &AppState, client_messages: Vec<ChatMessage>, use_web_search
         let model = state.settings.read("deepseek_chat_model").unwrap_or_else(|| "deepseek-flash".into());
         let response = client.post("https://api.deepseek.com/chat/completions")
             .bearer_auth(key.trim())
-            .json(&json!({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 700, "stream": false}))
+            .json(&json!({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 700, "stream": true}))
             .send().map_err(|e| format!("DeepSeek недоступен: {e}"))?;
-        let status = response.status();
-        let body: serde_json::Value = response.json().map_err(|e| format!("Некорректный ответ DeepSeek: {e}"))?;
-        if !status.is_success() { return Err(body["error"]["message"].as_str().unwrap_or("Ошибка DeepSeek API").to_string()); }
-        let content = body["choices"][0]["message"]["content"].as_str().unwrap_or("").trim().to_string();
+        let speak = state.settings.read("chat_speak_responses").map(|v| v != "false").unwrap_or(true);
+        let generation = jarvis_core::tts::generation();
+        let content = jarvis_core::chat::read_chat_stream(response, true, |_| {})?;
+        if speak && generation == jarvis_core::tts::generation() { jarvis_core::tts::speak(&speech_text(&content)); }
         if content.is_empty() { return Err("DeepSeek вернул пустой ответ".into()); }
-        if state.settings.read("chat_speak_responses").map(|v| v != "false").unwrap_or(true) { jarvis_core::tts::speak(&speech_text(&content)); }
         Ok(ChatReply { content: with_sources(content, &source_footer), provider, model })
     } else {
         let model = state.settings.read("local_chat_model").unwrap_or_else(|| "qwen3:8b".into());
         let response = client.post("http://127.0.0.1:11434/api/chat")
-            .json(&json!({"model": model, "messages": messages, "stream": false, "options": {"num_ctx": 4096}}))
+            .json(&json!({"model": model, "messages": messages, "stream": true, "think": false, "keep_alive": "15m", "options": {"num_ctx": 2048, "num_predict": 700}}))
             .send().map_err(|_| "Локальный Ollama не запущен. Установи Ollama и выполни команду загрузки модели ниже.".to_string())?;
-        let status = response.status();
-        let body: serde_json::Value = response.json().map_err(|e| format!("Некорректный ответ Ollama: {e}"))?;
-        if !status.is_success() { return Err(body["error"].as_str().unwrap_or("Ошибка Ollama").to_string()); }
-        let content = body["message"]["content"].as_str().unwrap_or("").trim().to_string();
+        let speak = state.settings.read("chat_speak_responses").map(|v| v != "false").unwrap_or(true);
+        let generation = jarvis_core::tts::generation();
+        let content = jarvis_core::chat::read_ollama_reply(response, |_| {})?;
+        if speak && generation == jarvis_core::tts::generation() { jarvis_core::tts::speak(&speech_text(&content)); }
         if content.is_empty() { return Err("Локальная модель вернула пустой ответ".into()); }
-        if state.settings.read("chat_speak_responses").map(|v| v != "false").unwrap_or(true) { jarvis_core::tts::speak(&speech_text(&content)); }
         Ok(ChatReply { content: with_sources(content, &source_footer), provider, model })
     }
 }

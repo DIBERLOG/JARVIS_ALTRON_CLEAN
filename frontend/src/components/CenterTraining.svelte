@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte"
+    import { trainingVoiceTab } from '@/lib/centerVoice'
     import TrainingStats from "./TrainingStats.svelte"
     import TrainingBody from "./TrainingBody.svelte"
     import TrainingPreferences from "./TrainingPreferences.svelte"
@@ -30,6 +31,7 @@
     }
     const warmups = ["Общая разминка", "Подготовка суставов и движений", "Разминочные подходы"]
     let tab = "today", planId = "push", exerciseIndex = 0, viewId = "", selectedKey = ""
+    $: tab = $trainingVoiceTab
     let weight = 0, reps = 8, rpe: number | null = 8, isWarmup = false
     let busy = false, error = "", now = Date.now(), note = ""
     let mood: number | null = null

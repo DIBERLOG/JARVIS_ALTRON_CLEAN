@@ -7,6 +7,7 @@ use std::process::{Child, Command};
 use seqdiff::ratio;
 
 mod structs;
+pub mod center;
 pub use structs::*;
 
 use crate::{config, i18n, APP_DIR};

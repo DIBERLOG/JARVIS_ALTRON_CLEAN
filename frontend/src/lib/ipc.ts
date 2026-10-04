@@ -107,6 +107,9 @@ function handleEvent(data: any) {
     console.log("IPC: Event", data.event, data)
 
     switch (data.event) {
+        case "center_command":
+            window.dispatchEvent(new CustomEvent("jarvis-center-command", { detail: data.text || "" }));
+            break;
         case "wake_word_detected":
         case "listening":
             jarvisState.set("listening")

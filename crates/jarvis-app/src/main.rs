@@ -161,6 +161,9 @@ fn main() -> Result<(), String> {
             IpcAction::Ping => {
                 // handled internally by server
             }
+            IpcAction::CenterReply { text, reply_id, follow_up } => {
+                std::thread::spawn(move || app::center_reply(text, reply_id, follow_up));
+            }
             _ => {}
         }
     });

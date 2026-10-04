@@ -3168,6 +3168,7 @@ name = "jarvis-core"
 version = "0.4.0"
 dependencies = [
  "chrono",
+ "cpal",
  "fastembed",
  "fluent",
  "fluent-bundle",
@@ -3202,6 +3203,7 @@ dependencies = [
  "tokio-tungstenite",
  "toml 0.9.11+spec-1.1.0",
  "unic-langid",
+ "url",
  "vosk",
  "winrt-notification",
 ]

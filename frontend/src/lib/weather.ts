@@ -1,20 +1,22 @@
 import { invoke } from "@tauri-apps/api/core"
+import { writable } from 'svelte/store'
+export const weatherPeriod = writable(7)
 
 export type WeatherDay = { date: string; code: number; high: number; low: number; rain: number | null; wind: number | null; uv: number | null }
-export type WeekWeather = { city: string; requested_city: string; region: string; timezone: string; updated_at: string; days: WeatherDay[]; warning?: string }
+export type WeekWeather = { city: string; requested_city: string; region: string; timezone: string; updated_at: string; days: WeatherDay[]; seasonal?: boolean; warning?: string }
 export type WeatherKind = "sun" | "partly" | "cloud" | "fog" | "rain" | "snow" | "storm" | "unknown"
 
 let cached: WeekWeather | null = null
 export const getWeatherCity = () => invoke<string>("center_get_weather_city")
-export async function getWeekWeather(city?: string, force = false): Promise<WeekWeather> {
+export async function getWeekWeather(city?: string, force = false, days = 7): Promise<WeekWeather> {
     const requested = city || await getWeatherCity()
-    if (!force && cached && Date.now() - Date.parse(cached.updated_at) < 10 * 60_000 && requested.toLowerCase() === cached.requested_city.toLowerCase()) return cached
+    if (!force && cached && cached.days.length === days && Date.now() - Date.parse(cached.updated_at) < 10 * 60_000 && requested.toLowerCase() === cached.requested_city.toLowerCase()) return cached
     try {
-        cached = await invoke<WeekWeather>("center_get_weather", { city: city || null })
+        cached = await invoke<WeekWeather>("center_get_weather", { city: city || null, days })
         return cached
     } catch (error) {
         // Keep actual previously received data, never substitute another city's forecast.
-        if (cached && requested.toLowerCase() === cached.requested_city.toLowerCase()
+        if (cached && cached.days.length === days && requested.toLowerCase() === cached.requested_city.toLowerCase()
             && Date.now() - Date.parse(cached.updated_at) < 3 * 60 * 60_000) {
             return { ...cached, warning: String(error) }
         }
@@ -64,7 +66,7 @@ export function clothingFor(day: WeatherDay): { icon: string; text: string }[] {
 export function chartGeometry(days: WeatherDay[]) {
     const bottom = Math.floor(Math.min(...days.map(day => day.low)) / 5) * 5 - 2
     const top = Math.ceil(Math.max(...days.map(day => day.high)) / 5) * 5 + 3
-    const x = (index: number) => 42 + (index + .5) * (646 / 7)
+    const x = (index: number) => 42 + (index + .5) * (646 / days.length)
     const y = (value: number) => 30 + (top - value) / (top - bottom) * 150
     const points = days.map((day, index) => ({ x: x(index), high: y(day.high), low: y(day.low) }))
     const curve = (key: "high" | "low") => points.reduce((path, point, index) => {
@@ -73,5 +75,5 @@ export function chartGeometry(days: WeatherDay[]) {
         return `${path} C ${middle} ${previous[key]}, ${middle} ${point[key]}, ${point.x} ${point[key]}`
     }, "")
     const highPath = curve("high")
-    return { points, highPath, lowPath: curve("low"), areaPath: `${highPath} L ${points[6].x} 194 L ${points[0].x} 194 Z`, ticks: Array.from({ length: 5 }, (_, index) => { const value = bottom + (top - bottom) * index / 4; return { value: Math.round(value), y: y(value) } }) }
+    return { points, highPath, lowPath: curve("low"), areaPath: `${highPath} L ${points[points.length-1].x} 194 L ${points[0].x} 194 Z`, ticks: Array.from({ length: 5 }, (_, index) => { const value = bottom + (top - bottom) * index / 4; return { value: Math.round(value), y: y(value) } }) }
 }

@@ -1,0 +1,43 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{Module}=require('node:module'),ts=require('typescript')
+function load(file,stubs){const filename=path.resolve(file),mod=new Module(filename,module);mod.filename=filename;mod.paths=module.paths;mod.require=name=>stubs[name]||require(name);mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,filename);return mod.exports}
+async function main(){
+    const store=await import('svelte/store'),calls=[];global.window={dispatchEvent(){}};global.CustomEvent=class{};global.localStorage={setItem(){},getItem(){return null}}
+    let db={reminders:[],birthdays:[],notes:[],habits:[{id:'a',title:'Зал',target:1,entries:{}},{id:'b',title:'Вода',target:8,entries:{}}]}
+    const ipc={sendAction:(action,data)=>{calls.push({action,...data});return true},activeNotification:store.writable(null)}
+    const core={loadCenterData:async()=>structuredClone(db),saveCenterData:async data=>db=data,dayKey:()=> '2026-10-03',makeId:()=>Math.random().toString()}
+    const timer=load('src/lib/timer.ts',{'svelte/store':store,'@/lib/ipc':ipc})
+    const voice=load('src/lib/centerVoice.ts',{'svelte/store':store,'@tauri-apps/api/core':{invoke:async()=>{}},'./ipc':ipc,'./center':core,'./timer':timer,'./training':{defaultTraining:()=>({})},'./weather':{getWeekWeather:async()=>({}),weatherPeriod:store.writable(7)}})
+    assert.equal(voice.spokenNumber('вторую'),2)
+    assert.equal(voice.spokenNumber('шестнадцатую'),16)
+    assert.equal(voice.spokenNumber('пятилетняя'),undefined)
+    await voice.handleCenterVoice('отметь привычку');assert.equal(calls.at(-1).follow_up,true)
+    await voice.handleCenterVoice('вторую');assert.equal(db.habits[1].entries['2026-10-03'],1);assert.equal(db.habits[0].entries['2026-10-03'],undefined)
+    await voice.handleCenterVoice('создай заметку');await voice.handleCenterVoice('Покупки');await voice.handleCenterVoice('Молоко и хлеб');assert.equal(db.notes[0].title,'Покупки');assert.equal(db.notes[0].text,'Молоко и хлеб')
+    await voice.handleCenterVoice('запусти таймер работа');assert.equal(store.get(timer.timerState).total,3000);assert.equal(store.get(timer.timerState).phase,'running')
+    await voice.handleCenterVoice('пауза таймера');assert.equal(store.get(timer.timerState).phase,'paused')
+    await voice.handleCenterVoice('сброс таймера');assert.equal(store.get(timer.timerState).remaining,3000)
+    let translated=-1;voice.voiceNews.set([{title:'A',url:'https://a.test'},{title:'B',url:'https://b.test'}]);voice.setNewsVoiceAction(async(action,index)=>{translated=index})
+    await voice.handleCenterVoice('переведи новость');await voice.handleCenterVoice('вторую');assert.equal(translated,1)
+    await voice.handleCenterVoice('переведи новость');await voice.handleCenterVoice('99');assert.equal(calls.at(-1).follow_up,true);await voice.handleCenterVoice('отмена')
+    timer.timerState.set({label:'Test',total:600,remaining:301,deadline:Date.now()+300000,phase:'running'});const count=calls.length;timer.tickTimer();timer.tickTimer();assert.equal(calls.length,count+1);assert.match(calls.at(-1).text,/пять минут/)
+    const now=Date.now();timer.timerState.set({label:'Test',total:600,remaining:61,deadline:now+60000,phase:'running'});timer.tickTimer(now);assert.match(calls.at(-1).text,/одна минута/)
+    assert.equal(calls.at(-1).reply_id,'timer_one_minute')
+    await voice.handleCenterVoice('запусти таймер на 15 минут');assert.equal(store.get(timer.timerState).total,900)
+    await voice.handleCenterVoice('запусти пресет таймера');assert.equal(calls.at(-1).reply_id,'timer_ask_preset')
+    await voice.handleCenterVoice('учёба');assert.equal(store.get(timer.timerState).total,1500)
+    await voice.handleCenterVoice('установи таймер');assert.equal(calls.at(-1).reply_id,'timer_ask_duration')
+    await voice.handleCenterVoice('десять минут');assert.equal(store.get(timer.timerState).total,600)
+    await voice.handleCenterVoice('покажи погоду');assert.equal(calls.at(-1).reply_id,'weather_ask_period')
+    await voice.handleCenterVoice('два месяца');assert.equal(calls.at(-1).reply_id,'weather_two_months')
+    await voice.handleCenterVoice('отметь первую привычку');assert.equal(calls.at(-1).reply_id,'habit_marked')
+    await voice.handleCenterVoice('отметь первую привычку');assert.equal(calls.at(-1).reply_id,'habit_target_reached')
+    voice.setNewsVoiceAction(undefined)
+    let refreshes=0
+    const refresh=voice.handleCenterVoice('обнови ленту')
+    setTimeout(()=>voice.setNewsVoiceAction(async action=>{if(action==='refresh')refreshes++}),20)
+    await refresh;assert.equal(refreshes,1);assert.equal(calls.at(-1).reply_id,'news_refresh')
+    voice.centerVoiceError(new Error('Эта новость уже переводится.'));assert.equal(calls.at(-1).reply_id,'news_translation_busy')
+    for(const call of calls.filter(call=>call.reply_id))assert.ok(fs.existsSync(path.resolve('../resources/sound/command-replies/ru',call.reply_id+'.mp3')),call.reply_id)
+    console.log('Center voice: recorded replies, delayed feed refresh, named presets, duration dialog, weather periods, notes, habits and timer milestones passed')
+}
+main().then(()=>process.exit(0)).catch(error=>{console.error(error);process.exit(1)})

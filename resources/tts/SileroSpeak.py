@@ -3,6 +3,7 @@ import json
 import sys
 import torch
 import sounddevice as sd
+from AudioOutput import select_output
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--text")
@@ -10,10 +11,6 @@ parser.add_argument("--server", action="store_true")
 args = parser.parse_args()
 if not args.server and not args.text:
     parser.error("--text is required unless --server is used")
-
-device_name = next((d["name"] for d in sd.query_devices() if "CABLE Input" in d["name"]), None)
-if not device_name:
-    raise RuntimeError("CABLE Input (VB-Audio Virtual Cable) not found")
 
 torch.set_num_threads(4)
 model, _ = torch.hub.load(
@@ -26,7 +23,7 @@ model, _ = torch.hub.load(
 model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 def speak(text: str) -> None:
     audio = model.apply_tts(text=text, speaker="eugene", sample_rate=48000)
-    sd.play(audio.detach().cpu().numpy(), samplerate=48000, device=device_name)
+    sd.play(audio.detach().cpu().numpy(), samplerate=48000, device=select_output(sd))
     sd.wait()
 
 
