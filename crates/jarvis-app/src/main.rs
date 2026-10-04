@@ -38,6 +38,7 @@ fn main() -> Result<(), String> {
 
     // log some base info
     info!("Starting Jarvis v{} ...", config::APP_VERSION.unwrap());
+    info!("ALTRON kernel {} active: catalog, routing, action planning, settings and audio history", commands::KERNEL_VERSION);
     info!("Config directory is: {}", APP_CONFIG_DIR.get().unwrap().display());
     info!("Log directory is: {}", APP_LOG_DIR.get().unwrap().display());
 

@@ -1,0 +1,19 @@
+[[commands]]
+id = "windows_minimize_all"
+type = "cli"
+description = "Свернуть все окна и показать рабочий стол"
+cli_cmd = "powershell.exe"
+cli_args = ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "(New-Object -ComObject Shell.Application).MinimizeAll()"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["сверни все окна", "свернуть все окна", "сверни окна", "покажи рабочий стол", "убери все окна", "сверни всё"]
+phrases.en = ["minimize all windows", "show desktop"]
+
+[[commands]]
+id = "windows_restore_all"
+type = "cli"
+description = "Восстановить окна после сворачивания"
+cli_cmd = "powershell.exe"
+cli_args = ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", "(New-Object -ComObject Shell.Application).UndoMinimizeALL()"]
+sounds.ru = ["ok1", "ok2", "ok3"]
+phrases.ru = ["верни окна", "восстанови окна", "разверни окна обратно", "отмени сворачивание"]
+phrases.en = ["restore windows", "undo minimize"]

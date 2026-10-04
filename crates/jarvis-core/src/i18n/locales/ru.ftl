@@ -82,7 +82,7 @@ settings-enabled = Включено
 settings-disabled = Отключено
 
 # settings - beta notice
-settings-beta-title = БЕТА версия!
+settings-beta-title = Пререлиз!
 settings-beta-desc = Часть функций может работать некорректно.
 settings-beta-feedback = Сообщайте обо всех найденных багах в
 settings-beta-bot = наш телеграм бот

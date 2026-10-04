@@ -1,424 +1,273 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::fs;
-use std::time::Duration;
-use std::process::{Child, Command};
+//! Compatibility adapter between the application and the ALTRON kernel.
+//! Catalog loading, phrase selection and action planning live in the new crate.
+use altron_command_engine::{
+    catalog,
+    dispatch::{self, Definition, Plan},
+    matching::{self, Candidate, Selection},
+    process,
+};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    process::Child,
+};
 
-use seqdiff::ratio;
-
-mod structs;
 pub mod center;
-pub use structs::*;
-
+mod structs;
 use crate::{config, i18n, APP_DIR};
-
+pub use structs::*;
+pub const KERNEL_VERSION: &str = altron_command_engine::VERSION;
 #[cfg(feature = "lua")]
-use crate::lua::{self, SandboxLevel, CommandContext};
+use crate::lua::{self, CommandContext, SandboxLevel};
 
 pub fn parse_commands() -> Result<Vec<JCommandsList>, String> {
-    let mut commands: Vec<JCommandsList> = Vec::new();
-
-    let commands_path = APP_DIR.join(config::COMMANDS_PATH);
-    let cmd_dirs = fs::read_dir(&commands_path)
-        .map_err(|e| format!("Error reading commands directory {:?}: {}", commands_path, e))?;
-
-    for entry in cmd_dirs.flatten() {
-        let cmd_path = entry.path();
-        let toml_file = cmd_path.join("command.toml");
-        
-        if !toml_file.exists() {
-            continue;
-        }
-        
-        let content = match fs::read_to_string(&toml_file) {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Failed to read {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
-
-        let file: JCommandsList = match toml::from_str(&content) {
-            Ok(f) => f,
-            Err(e) => {
-                warn!("Failed to parse {}: {}", toml_file.display(), e);
-                continue;
-            }
-        };
-
-        commands.push(JCommandsList {
-            path: cmd_path,
-            commands: file.commands,
-        });
+    let loaded = catalog::load::<JCommand>(&APP_DIR.join(config::COMMANDS_PATH))
+        .map_err(|error| format!("ALTRON command catalog: {error}"))?;
+    for warning in loaded.warnings {
+        warn!("ALTRON command catalog: {warning}");
     }
-
-    if commands.is_empty() {
-        Err("No commands found".into())
-    } else {
-        info!("Loaded {} command pack(s)", commands.len());
-        Ok(commands)
-    }
+    let packs: Vec<_> = loaded
+        .packs
+        .into_iter()
+        .map(|pack| JCommandsList {
+            path: pack.directory,
+            commands: pack.definitions,
+        })
+        .collect();
+    debug!("ALTRON kernel: loaded {} command packs", packs.len());
+    Ok(packs)
 }
 
-
+/// Retain the existing model-cache fingerprint during the migration.
 pub fn commands_hash(commands: &[JCommandsList]) -> String {
-    use sha2::{Sha256, Digest};
-    
-    let mut hasher = Sha256::new();
-    
+    use sha2::{Digest, Sha256};
     let lang = i18n::get_language();
+    let mut hasher = Sha256::new();
     hasher.update(lang.as_bytes());
     hasher.update(b"|");
-
-    // collect all command ids and phrases for current language, sorted
-    let mut all_data: Vec<(&str, _)> = commands.iter()
-        .flat_map(|ac| ac.commands.iter().map(|c| (c.id.as_str(), c.get_phrases(&lang))))
+    let mut entries: Vec<_> = commands
+        .iter()
+        .flat_map(|pack| pack.commands.iter())
+        .map(|command| (command.id.as_str(), command.get_phrases(&lang)))
         .collect();
-    all_data.sort_by_key(|(id, _)| *id);
-    
-    for (id, phrases) in all_data {
+    entries.sort_by_key(|(id, _)| *id);
+    for (id, phrases) in entries {
         hasher.update(id.as_bytes());
         for phrase in phrases.iter() {
             hasher.update(phrase.as_bytes());
         }
     }
-    
     format!("{:x}", hasher.finalize())
 }
 
+pub enum CommandSelection<'a> {
+    Found(&'a PathBuf, &'a JCommand),
+    Ambiguous(Vec<&'a str>),
+    Missing,
+}
+
+fn resolve_in_language<'a>(
+    phrase: &str,
+    packs: &'a [JCommandsList],
+    language: &str,
+    fuzzy: bool,
+) -> CommandSelection<'a> {
+    let entries: Vec<_> = packs
+        .iter()
+        .flat_map(|pack| {
+            pack.commands
+                .iter()
+                .map(move |command| (&pack.path, command))
+        })
+        .collect();
+    let candidates: Vec<_> = entries
+        .iter()
+        .enumerate()
+        .flat_map(|(key, (_, command))| {
+            command
+                .get_phrases(language)
+                .iter()
+                .map(|alias| Candidate {
+                    key,
+                    id: command.id.clone(),
+                    phrase: alias.clone(),
+                    allow_fuzzy: dispatch::allows_approximate(&command.id, &command.cmd_type),
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    match matching::select(phrase, &candidates, fuzzy) {
+        Selection::Found(key) => {
+            let (path, command) = entries[key];
+            CommandSelection::Found(path, command)
+        }
+        Selection::Ambiguous(keys) => CommandSelection::Ambiguous(
+            keys.into_iter()
+                .map(|key| entries[key].1.id.as_str())
+                .collect(),
+        ),
+        Selection::Missing => CommandSelection::Missing,
+    }
+}
+
+pub fn resolve_command<'a>(
+    phrase: &str,
+    packs: &'a [JCommandsList],
+    fuzzy: bool,
+) -> CommandSelection<'a> {
+    resolve_in_language(phrase, packs, &i18n::get_language(), fuzzy)
+}
 
 pub fn fetch_command<'a>(
     phrase: &str,
-    commands: &'a [JCommandsList],
+    packs: &'a [JCommandsList],
 ) -> Option<(&'a PathBuf, &'a JCommand)> {
-    let lang = i18n::get_language();
-
-    let phrase = phrase.trim().to_lowercase();
-    if phrase.is_empty() {
-        return None;
+    match resolve_command(phrase, packs, true) {
+        CommandSelection::Found(path, command) => Some((path, command)),
+        _ => None,
     }
-
-    let phrase_chars: Vec<char> = phrase.chars().collect();
-    let phrase_words: Vec<&str> = phrase.split_whitespace().collect();
-
-    let mut result: Option<(&PathBuf, &JCommand)> = None;
-    let mut best_score = config::CMD_RATIO_THRESHOLD;
-
-    for cmd_list in commands {
-        for cmd in &cmd_list.commands {
-            let cmd_phrases = cmd.get_phrases(&lang);
-            
-            for cmd_phrase in cmd_phrases.iter() {
-                let cmd_phrase_lower = cmd_phrase.trim().to_lowercase();
-                let cmd_phrase_chars: Vec<char> = cmd_phrase_lower.chars().collect();
-                
-                // character-level similarity
-                let char_ratio = ratio(&phrase_chars, &cmd_phrase_chars);
-                
-                // word-level similarity
-                let cmd_words: Vec<&str> = cmd_phrase_lower.split_whitespace().collect();
-                let word_score = word_overlap_score(&phrase_words, &cmd_words);
-                
-                // combined score
-                let score = (char_ratio * 0.6) + (word_score * 0.4);
-                
-                // early exit on perfect match
-                if score >= 99.0 {
-                    debug!("Perfect match: '{}' -> '{}'", phrase, cmd_phrase_lower);
-                    return Some((&cmd_list.path, cmd));
-                }
-                
-                if score > best_score {
-                    best_score = score;
-                    result = Some((&cmd_list.path, cmd));
-                }
-            }
-        }
-    }
-
-    if let Some((_, cmd)) = result {
-        info!("Fuzzy match: '{}' -> cmd '{}' (score: {:.1}%)", phrase, cmd.id, best_score);
-    } else {
-        debug!("No match for '{}' (best: {:.1}%)", phrase, best_score);
-    }
-    
-    result
 }
 
-
-fn word_overlap_score(input_words: &[&str], cmd_words: &[&str]) -> f64 {
-    if input_words.is_empty() || cmd_words.is_empty() {
-        return 0.0;
+pub fn fetch_exact_command<'a>(
+    phrase: &str,
+    packs: &'a [JCommandsList],
+) -> Option<(&'a PathBuf, &'a JCommand)> {
+    match resolve_command(phrase, packs, false) {
+        CommandSelection::Found(path, command) => Some((path, command)),
+        _ => None,
     }
-
-    let mut matched = 0.0;
-    
-    // pre-compute cmd word chars to avoid repeated allocations
-    let cmd_word_chars: Vec<Vec<char>> = cmd_words
-        .iter()
-        .map(|w| w.chars().collect())
-        .collect();
-    
-    for input_word in input_words {
-        let input_chars: Vec<char> = input_word.chars().collect();
-        
-        let best_word_match = cmd_word_chars
-            .iter()
-            .map(|cw| ratio(&input_chars, cw))
-            .fold(0.0_f64, f64::max);
-        
-        if best_word_match > 70.0 {
-            matched += best_word_match / 100.0;
-        }
-    }
-
-    let max_words = input_words.len().max(cmd_words.len()) as f64;
-    (matched / max_words) * 100.0
 }
 
+pub fn is_negated(phrase: &str) -> bool {
+    matching::is_negated(phrase)
+}
 
-
+pub fn allow_intent_candidate(command: &JCommand) -> bool {
+    dispatch::allows_approximate(&command.id, &command.cmd_type)
+}
 
 pub fn execute_exe(exe: &str, args: &[String]) -> std::io::Result<Child> {
-    Command::new(exe).args(args).spawn()
+    process::launch(Path::new(exe), args)
 }
 
-pub fn execute_cli(cmd: &str, args: &[String]) -> std::io::Result<Child> {
-    debug!("Spawning: cmd /C {} {:?}", cmd, args);
-
-    if cfg!(target_os = "windows") {
-        Command::new("cmd").arg("/C").arg(cmd).args(args).spawn()
-    } else {
-        Command::new("sh").arg("-c").arg(cmd).args(args).spawn()
-    }
+pub fn execute_cli(exe: &str, args: &[String]) -> std::io::Result<Child> {
+    process::launch(Path::new(exe), args)
 }
 
-pub fn execute_command(cmd_path: &PathBuf, cmd_config: &JCommand, phrase: Option<&str>, slots: Option<&HashMap<String, SlotValue>>) -> Result<bool, String> {
-    // execute command by the type
-    match cmd_config.cmd_type.as_str() {
-
-        // BRUH
-        "voice" => Ok(true),
-        
-        // LUA command
-        #[cfg(feature = "lua")]
-        "lua" => {
-            execute_lua_command(cmd_path, cmd_config, phrase, slots)
-        }
-
-        // AutoHotkey command
-        // @TODO: Consider adding ahk source files execution?
-        "ahk" => {
-            let exe_path_absolute = Path::new(&cmd_config.exe_path);
-            let exe_path_local = cmd_path.join(&cmd_config.exe_path);
-
-            let exe_path = if exe_path_absolute.exists() {
-                exe_path_absolute
-            } else {
-                exe_path_local.as_path()
-            };
-
-            execute_exe(exe_path.to_str().unwrap(), &cmd_config.exe_args)
-                .map(|_| true)
-                .map_err(|e| format!("AHK process spawn error: {}", e))
-        }
-
-        // Start a replacement Jarvis process, then end this process after the
-        // restart helper has had time to take over.
-        "restart" => {
-            let restart_helper = cmd_path.join(&cmd_config.exe_path);
-            execute_exe(restart_helper.to_str().unwrap(), &cmd_config.exe_args)
-                .map_err(|e| format!("Jarvis restart error: {}", e))?;
-
-            std::thread::spawn(|| {
-                std::thread::sleep(Duration::from_millis(500));
+pub fn execute_command(
+    cmd_path: &PathBuf,
+    command: &JCommand,
+    phrase: Option<&str>,
+    slots: Option<&HashMap<String, SlotValue>>,
+) -> Result<bool, String> {
+    let definition = Definition {
+        kind: &command.cmd_type,
+        executable: &command.exe_path,
+        executable_arguments: &command.exe_args,
+        cli: &command.cli_cmd,
+        cli_arguments: &command.cli_args,
+        script: &command.script,
+    };
+    let plan = dispatch::plan(cmd_path, &definition)?;
+    info!(
+        "ALTRON kernel: executing {} ({})",
+        command.id, command.cmd_type
+    );
+    match plan {
+        Plan::Acknowledge => Ok(true),
+        Plan::EndChain => Ok(false),
+        Plan::Launch { program, arguments } => process::launch(&program, &arguments)
+            .map(|_| true)
+            .map_err(|error| format!("Command process: {error}")),
+        Plan::Restart {
+            program,
+            arguments,
+            grace,
+        } => {
+            process::launch(&program, &arguments)
+                .map_err(|error| format!("Restart helper: {error}"))?;
+            std::thread::spawn(move || {
+                std::thread::sleep(grace);
                 std::process::exit(0);
             });
             Ok(false)
         }
-        
-        // CLI command type
-        // @TODO: Consider security restrictions
-        "cli" => {
-            execute_cli(&cmd_config.cli_cmd, &cmd_config.cli_args)
-                .map(|_| true)
-                .map_err(|e| format!("CLI command error: {}", e))
-        }
-        
-        // TERMINATOR command (T1000)
-        "terminate" => {
-            std::thread::sleep(Duration::from_secs(2));
+        Plan::Exit { grace } => {
+            std::thread::sleep(grace);
             std::process::exit(0);
         }
-        
-        // STOP CHANING
-        "stop_chaining" => Ok(false),
-
-        // other
-        _ => {
-            error!("Command type unknown: {}", cmd_config.cmd_type);
-            Err(format!("Command type unknown: {}", cmd_config.cmd_type).into())
+        Plan::Script(script_path) => {
+            #[cfg(feature = "lua")]
+            {
+                let context = CommandContext {
+                    phrase: phrase.unwrap_or_default().into(),
+                    command_id: command.id.clone(),
+                    command_path: cmd_path.clone(),
+                    language: i18n::get_language(),
+                    slots: slots.cloned(),
+                };
+                lua::execute(
+                    &script_path,
+                    context,
+                    SandboxLevel::from_str(&command.sandbox),
+                    std::time::Duration::from_millis(command.timeout),
+                )
+                .map(|result| result.chain)
+                .map_err(|error| error.to_string())
+            }
+            #[cfg(not(feature = "lua"))]
+            {
+                let _ = (script_path, phrase, slots);
+                Err("Lua backend is not enabled in this process".into())
+            }
         }
     }
 }
 
-// look up a command by its ID
 pub fn get_command_by_id<'a>(
-    commands: &'a [JCommandsList],
+    packs: &'a [JCommandsList],
     id: &str,
 ) -> Option<(&'a PathBuf, &'a JCommand)> {
-    for cmd_list in commands {
-        for cmd in &cmd_list.commands {
-            if cmd.id == id {
-                return Some((&cmd_list.path, cmd));
-            }
-        }
-    }
-    None
+    packs.iter().find_map(|pack| {
+        pack.commands
+            .iter()
+            .find(|command| command.id == id)
+            .map(|command| (&pack.path, command))
+    })
 }
 
-pub fn list_paths(commands: &[JCommandsList]) -> Vec<&Path> {
-    commands.iter().map(|x| x.path.as_path()).collect()
-}
-
-#[cfg(feature = "lua")]
-fn execute_lua_command(
-    cmd_path: &PathBuf,
-    cmd_config: &JCommand,
-    phrase: Option<&str>,
-    slots: Option<&HashMap<String, SlotValue>>
-) -> Result<bool, String> {
-    // get script path
-
-    let script_name = if cmd_config.script.is_empty() {
-        "script.lua"
-    } else {
-        &cmd_config.script
-    };
-    
-    let script_path = cmd_path.join(script_name);
-    
-    if !script_path.exists() {
-        return Err(format!("Lua script not found: {}", script_path.display()));
-    }
-    
-    // parse sandbox level
-    let sandbox = SandboxLevel::from_str(&cmd_config.sandbox);
-
-    // create context
-    let context = CommandContext {
-        phrase: phrase.unwrap_or("").to_string(),
-        command_id: cmd_config.id.clone(),
-        command_path: cmd_path.clone(),
-        language: i18n::get_language(),
-        slots: slots.map(|s| s.clone()),
-    };
-    
-    // get timeout
-    let timeout = Duration::from_millis(cmd_config.timeout);
-    
-    info!("Executing Lua command: {} (sandbox: {:?}, timeout: {:?})", 
-          cmd_config.id, sandbox, timeout);
-    
-    // execute
-    match lua::execute(&script_path, context, sandbox, timeout) {
-        Ok(result) => {
-            info!("Lua command {} completed (chain: {})", cmd_config.id, result.chain);
-            Ok(result.chain)
-        }
-        Err(e) => {
-            error!("Lua command {} failed: {}", cmd_config.id, e);
-            Err(e.to_string())
-        }
-    }
-}
-
-/// Prefer a phrase the user actually said over a model prediction.
-pub fn fetch_exact_command<'a>(
-    phrase: &str,
-    commands: &'a [JCommandsList],
-) -> Option<(&'a PathBuf, &'a JCommand)> {
-    let lang = i18n::get_language();
-    let spoken = normalize_phrase(phrase);
-    if spoken.is_empty() {
-        return None;
-    }
-
-    for list in commands {
-        for command in &list.commands {
-            if command.get_phrases(&lang).iter()
-                .any(|candidate| normalize_phrase(candidate) == spoken) {
-                return Some((&list.path, command));
-            }
-        }
-    }
-
-    for list in commands {
-        for command in &list.commands {
-            if command.get_phrases(&lang).iter()
-                .any(|candidate| matches_phrase_template(&spoken, candidate)) {
-                return Some((&list.path, command));
-            }
-        }
-    }
-    None
-}
-
-fn matches_phrase_template(spoken: &str, template: &str) -> bool {
-    let template = normalize_phrase(template);
-    let Some((prefix, rest)) = template.split_once('{') else {
-        return false;
-    };
-    let Some((slot, suffix)) = rest.split_once('}') else {
-        return false;
-    };
-    if slot.is_empty() || spoken.len() <= prefix.len() + suffix.len()
-        || !spoken.starts_with(prefix) || !spoken.ends_with(suffix) {
-        return false;
-    }
-    let middle = &spoken[prefix.len()..spoken.len() - suffix.len()];
-    !middle.trim().is_empty()
-}
-
-fn normalize_phrase(phrase: &str) -> String {
-    phrase.trim()
-        .trim_matches(|c: char| matches!(c, '.' | ',' | '!' | '?' | ':' | ';' | '«' | '»' | '…'))
-        .to_lowercase()
-        .replace('ё', "е")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
+pub fn list_paths(packs: &[JCommandsList]) -> Vec<&Path> {
+    packs.iter().map(|pack| pack.path.as_path()).collect()
 }
 
 #[cfg(test)]
 mod phrase_tests {
-    use super::{matches_phrase_template, normalize_phrase};
-
+    use super::*;
     #[test]
     fn exact_phrases_ignore_punctuation_and_yo() {
-        assert_eq!(normalize_phrase("  Открой Дискорд! "), "открой дискорд");
-        assert_eq!(normalize_phrase("счётчик"), "счетчик");
+        assert_eq!(matching::normalize("  Открой Дискорд! "), "открой дискорд");
+        assert_eq!(matching::normalize("счётчик"), "счетчик");
     }
-
     #[test]
     fn name_templates_need_a_nonempty_name() {
-        assert!(matches_phrase_template("поздоровайся с иваном", "поздоровайся с {name}"));
-        assert!(matches_phrase_template("привет анна", "привет {name}"));
-        assert!(!matches_phrase_template("поздоровайся с", "поздоровайся с {name}"));
-        assert!(!matches_phrase_template("привет", "привет {name}"));
+        assert!(matching::template_matches(
+            "поздоровайся с иваном",
+            "поздоровайся с {name}"
+        ));
+        assert!(matching::template_matches("привет анна", "привет {name}"));
+        assert!(!matching::template_matches("привет", "привет {name}"));
     }
-
     #[test]
     fn dialogue_examples_resolve_to_commands() {
-        crate::i18n::init("ru");
         let manifests = [
             include_str!("../../../resources/commands/browser/command.toml"),
             include_str!("../../../resources/commands/discord/command.toml"),
             include_str!("../../../resources/commands/steam/command.toml"),
             include_str!("../../../resources/commands/weather/command.toml"),
         ];
-        let packs: Vec<super::JCommandsList> = manifests.iter()
-            .map(|manifest| toml::from_str(manifest).expect("valid command manifest"))
+        let packs: Vec<JCommandsList> = manifests
+            .iter()
+            .map(|manifest| toml::from_str(manifest).unwrap())
             .collect();
         for (phrase, expected) in [
             ("открой браузер", "browser_open"),
@@ -427,7 +276,86 @@ mod phrase_tests {
             ("открой расписание", "open_schedule"),
             ("погода в Москве", "weather"),
         ] {
-            assert_eq!(super::fetch_exact_command(phrase, &packs).map(|(_, command)| command.id.as_str()), Some(expected));
+            let CommandSelection::Found(_, command) =
+                resolve_in_language(phrase, &packs, "ru", false)
+            else {
+                panic!("Unresolved: {phrase}");
+            };
+            assert_eq!(command.id, expected);
         }
+    }
+    #[test]
+    fn real_catalog_preserves_all_unique_aliases() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../resources/commands");
+        let loaded = catalog::load::<JCommand>(&root).unwrap();
+        assert!(loaded.warnings.is_empty(), "{:?}", loaded.warnings);
+        let packs: Vec<_> = loaded
+            .packs
+            .into_iter()
+            .map(|pack| JCommandsList {
+                path: pack.directory,
+                commands: pack.definitions,
+            })
+            .collect();
+        let mut checked = 0;
+        for language in ["ru", "en", "ua"] {
+            let mut aliases: HashMap<String, Vec<String>> = HashMap::new();
+            for command in packs.iter().flat_map(|pack| &pack.commands) {
+                for phrase in command
+                    .get_phrases(language)
+                    .iter()
+                    .filter(|phrase| !phrase.contains('{'))
+                {
+                    let ids = aliases.entry(matching::request(phrase)).or_default();
+                    if !ids.contains(&command.id) {
+                        ids.push(command.id.clone());
+                    }
+                }
+            }
+            for (alias, ids) in aliases {
+                if ids.len() == 1 {
+                    let CommandSelection::Found(_, command) =
+                        resolve_in_language(&alias, &packs, language, false)
+                    else {
+                        panic!("Unresolved {language}: {alias}");
+                    };
+                    assert_eq!(command.id, ids[0], "{language}: {alias}");
+                    checked += 1;
+                } else {
+                    assert!(
+                        matches!(
+                            resolve_in_language(&alias, &packs, language, false),
+                            CommandSelection::Ambiguous(_)
+                        ),
+                        "Conflicting alias: {alias}"
+                    );
+                }
+            }
+        }
+        assert!(checked > 100, "Too few aliases tested: {checked}");
+        println!("ALTRON compatibility: {checked} unique aliases checked in ru/en/ua");
+    }
+    #[test]
+    fn manifest_execution_contracts_are_unchanged() {
+        let manifest = include_str!("../../../resources/commands/windows/command.toml");
+        let commands: JCommandsList = toml::from_str(manifest).unwrap();
+        for command in &commands.commands {
+            let definition = Definition {
+                kind: &command.cmd_type,
+                executable: &command.exe_path,
+                executable_arguments: &command.exe_args,
+                cli: &command.cli_cmd,
+                cli_arguments: &command.cli_args,
+                script: &command.script,
+            };
+            let Plan::Launch { program, arguments } =
+                dispatch::plan(Path::new("."), &definition).unwrap()
+            else {
+                panic!("Expected launch plan");
+            };
+            assert_eq!(program, PathBuf::from("powershell.exe"));
+            assert_eq!(arguments, command.cli_args);
+        }
+        // Only constructing plans: this test never minimizes real windows.
     }
 }

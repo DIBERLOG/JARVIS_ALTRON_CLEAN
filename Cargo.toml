@@ -3,15 +3,16 @@ members = [
     "crates/jarvis-core",
     "crates/jarvis-app", 
     "crates/jarvis-gui",
-    "crates/jarvis-cli"
+    "crates/jarvis-cli",
+    "reimplementation/command-engine"
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.5.0"
-authors = ["Abraham Tugalov"]
-license = "GPL-3.0-only"
-repository = "https://github.com/Priler/jarvis"
+version = "0.6.0"
+authors = ["Егор Ангелов (DIBERLOG) — автор доработок", "Abraham Tugalov — автор исходного проекта"]
+license-file = "LICENSE.txt"
+repository = "https://github.com/DIBERLOG/JARVIS_ALTRON_CLEAN"
 edition = "2021"
 
 [workspace.dependencies]

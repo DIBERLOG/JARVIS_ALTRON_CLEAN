@@ -577,7 +577,7 @@
 </Button>
 
 <HDivider />
-<Footer />
+<Footer showOriginal={true} />
 
 <style lang="scss">
 .dialogue-personality {

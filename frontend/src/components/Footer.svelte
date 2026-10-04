@@ -1,4 +1,6 @@
 <script lang="ts">
+    export let showFork = true
+    export let showOriginal = false
     import { currentLanguage } from "@/stores"
 
     const forkGithub = "https://github.com/DIBERLOG"
@@ -10,6 +12,7 @@
 </script>
 
 <footer class="credits">
+    {#if showFork}
     <div class="fork-credit">
         <span class="credit-marker" aria-hidden="true"></span>
         <div>
@@ -21,6 +24,8 @@
         </a>
     </div>
 
+    {/if}
+    {#if showOriginal}
     <details class="original-credits">
         <summary>
             <span>{isRussian ? "Первоначальный автор и ссылки проекта" : "Original author and project links"}</span>
@@ -35,6 +40,7 @@
             </div>
         </div>
     </details>
+    {/if}
 </footer>
 
 <style lang="scss">

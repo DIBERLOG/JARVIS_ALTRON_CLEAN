@@ -563,7 +563,8 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
         ipc::send(IpcEvent::CenterCommand { text: "отмена".into() });
         return false;
     }
-    if (center_pending() && CENTER_PENDING.swap(false, Ordering::SeqCst)) || center_phrase(text) {
+    if (center_pending() && CENTER_PENDING.swap(false, Ordering::SeqCst))
+        || (!commands::is_negated(text) && center_phrase(text)) {
         if ipc::has_clients() { ipc::send(IpcEvent::CenterCommand { text: text.into() }); }
         else { center_reply("Откройте окно JARVIS, сэр. Центр сейчас не подключён.".into(), "voice_center_unavailable".into(), false); }
         return true;
@@ -603,18 +604,24 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
         }
     };
     
-    let exact_command = commands::fetch_exact_command(text, commands_list);
     let in_dialogue = DIALOGUE_MODE.load(Ordering::SeqCst);
-    // In dialogue, recognize real commands before treating the utterance as chat.
-    // Fuzzy phrase matching handles natural variants such as "открыть браузер".
-    let dialogue_command = if in_dialogue {
-        exact_command.or_else(|| commands::fetch_command(text, commands_list))
-    } else {
-        None
+    // The replacement kernel decides aliases/templates/approximate matches.
+    // An ambiguous selection must not be overridden by a model prediction.
+    let selected_command = match commands::resolve_command(text, commands_list, true) {
+        commands::CommandSelection::Found(path, command) => Some((path, command)),
+        commands::CommandSelection::Ambiguous(ids) => {
+            warn!("ALTRON kernel: ambiguous command: {:?}", ids);
+            if !voices::play_command_reply("voice_clarify", &language) {
+                tts::speak("Уточните команду, сэр. Подходят несколько действий.");
+            }
+            ipc::send(IpcEvent::Listening);
+            return true;
+        }
+        commands::CommandSelection::Missing => None,
     };
     let explicit_web_search = ["найди в интернете", "поищи в интернете", "найти в интернете", "проверь в сети", "найди в сети", "поищи в сети", "погугли", "загугли", "отыщи в интернете"]
         .iter().any(|phrase| text.contains(phrase));
-    if (in_dialogue || explicit_web_search) && dialogue_command.is_none() && exact_command.is_none() {
+    if (in_dialogue || explicit_web_search) && selected_command.is_none() {
         let response_started = std::time::Instant::now();
         let history = if in_dialogue { DIALOGUE_HISTORY.lock().map(|saved| saved.clone()).unwrap_or_default() } else { Vec::new() };
         match jarvis_core::chat::ask_spoken(text, &history) {
@@ -634,13 +641,16 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
             }
         }
     }
-    let cmd_result = dialogue_command.or(exact_command).or_else(|| {
+    let cmd_result = selected_command.or_else(|| {
+        // Do not turn a negative request or an uncertain power action into an
+        // executable command through the compatibility intent backend.
+        if commands::is_negated(text) { return None; }
         if let Some((intent_id, confidence)) = rt.block_on(intent::classify(text)) {
             info!("Intent recognized: {} (confidence: {:.2})", intent_id, confidence);
             intent::get_command_by_intent(commands_list, &intent_id)
+                .filter(|(_, command)| commands::allow_intent_candidate(command))
         } else {
-            info!("Intent not recognized, trying phrase similarity...");
-            commands::fetch_command(text, commands_list)
+            None
         }
     });
     

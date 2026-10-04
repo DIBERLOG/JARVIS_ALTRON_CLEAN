@@ -2,11 +2,12 @@
 name = "jarvis-core"
 version.workspace = true
 authors.workspace = true
-license.workspace = true
+license-file.workspace = true
 repository.workspace = true
 edition.workspace = true
 
 [dependencies]
+altron-command-engine = { path = "../../reimplementation/command-engine" }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

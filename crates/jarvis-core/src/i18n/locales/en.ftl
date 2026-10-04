@@ -82,7 +82,7 @@ settings-enabled = Enabled
 settings-disabled = Disabled
 
 # settings - beta notice
-settings-beta-title = BETA version!
+settings-beta-title = Pre-release version!
 settings-beta-desc = Some features may not work correctly.
 settings-beta-feedback = Report all bugs to
 settings-beta-bot = our Telegram bot

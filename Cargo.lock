@@ -93,6 +93,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "altron-command-engine"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.9.11+spec-1.1.0",
+]
+
+[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3136,7 +3146,7 @@ checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
 
 [[package]]
 name = "jarvis-app"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "glib 0.21.5",
  "gtk",
@@ -3154,7 +3164,7 @@ dependencies = [
 
 [[package]]
 name = "jarvis-cli"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "env_logger",
  "jarvis-core",
@@ -3165,8 +3175,9 @@ dependencies = [
 
 [[package]]
 name = "jarvis-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
+ "altron-command-engine",
  "chrono",
  "cpal",
  "fastembed",
@@ -3210,7 +3221,7 @@ dependencies = [
 
 [[package]]
 name = "jarvis-gui"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "chrono",
  "hound",

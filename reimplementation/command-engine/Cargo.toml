@@ -1,0 +1,14 @@
+[package]
+name = "altron-command-engine"
+version = "0.1.0"
+edition = "2021"
+authors = ["Егор Ангелов (DIBERLOG)"]
+license-file.workspace = true
+publish = false
+description = "Replacement ALTRON kernel: command catalog, routing, processes and persistence"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.149"
+toml = "=0.9.11"
+tempfile = "=3.24.0"
