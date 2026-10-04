@@ -1,5 +1,7 @@
 """Local no-play smoke test for resident model and repeated-response cache."""
 import json
+import hashlib
+import os
 import subprocess
 import sys
 import time
@@ -24,6 +26,11 @@ try:
         print("reply_seconds", round(time.monotonic() - started, 3), flush=True)
     process.stdin.close()
     assert process.wait(timeout=30) == 0
+    reference = root / "resources/tts/xtts-references/jarvis_ru_012.wav"
+    checkpoint = run / "final.pth"
+    profile = f"{checkpoint.resolve()}:{checkpoint.stat().st_mtime_ns}:{reference.stat().st_mtime_ns}:28:.42:.72:1.0"
+    key = hashlib.sha256((profile + "Здравствуйте, сэр. Я готов к работе.").encode("utf-8")).hexdigest()
+    assert (Path(os.environ["LOCALAPPDATA"]) / "JarvisVoiceStudio/speech-cache" / (key + ".wav")).is_file(), "Russian input was corrupted"
 finally:
     if process.poll() is None:
         process.kill()

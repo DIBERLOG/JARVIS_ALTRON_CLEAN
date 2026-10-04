@@ -63,5 +63,6 @@ jarvis_app = [
     "ort", "ndarray", "tokenizers", "regex",]
 
 intent = ["intent-classifier", "tokio"]
-lua = ["mlua", "reqwest", "quick-xml", "winrt-notification"]
+web-search = ["reqwest", "quick-xml"]
+lua = ["mlua", "web-search", "winrt-notification"]
 lua_only = ["lua", "tokio"]

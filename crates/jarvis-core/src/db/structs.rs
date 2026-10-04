@@ -172,7 +172,7 @@ impl Settings {
             "local_chat_model" => self.local_chat_model = val.to_string(),
             "deepseek_chat_model" => self.deepseek_chat_model = val.to_string(),
             "chat_speak_responses" => self.chat_speak_responses = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
-            "tts_mode" => { if val != "silero" && val != "xtts" { return Err("tts mode must be silero or xtts".into()) }; self.tts_mode = val.to_string(); }
+            "tts_mode" => { if !matches!(val, "silero" | "xtts" | "s2") { return Err("tts mode must be silero, xtts or s2".into()) }; self.tts_mode = val.to_string(); }
             "monitor_self" => self.monitor_self = match val { "true" => true, "false" => false, _ => return Err("expected true or false".into()) },
             "audio_output_mode" => { if !matches!(val,"direct"|"voicemod") { return Err("unsupported audio output mode".into()) }; self.audio_output_mode=val.into(); },
             "assistant_personality" => { if val != "jarvis" && val != "altron" { return Err("personality must be jarvis or altron".into()) }; self.personality = val.to_string(); }
@@ -315,6 +315,8 @@ mod tts_mode_tests {
         let mut settings = Settings::default();
         settings.set("tts_mode", "xtts").unwrap();
         assert_eq!(settings.get("tts_mode").as_deref(), Some("xtts"));
+        settings.set("tts_mode", "s2").unwrap();
+        assert_eq!(settings.get("tts_mode").as_deref(), Some("s2"));
         assert!(settings.set("tts_mode", "windows").is_err());
     }
 

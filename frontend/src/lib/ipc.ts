@@ -9,6 +9,7 @@ export type JarvisState = "disconnected" | "idle" | "listening" | "processing"
 export const jarvisState = writable<JarvisState>("disconnected")
 export const ipcConnected = writable(false)
 export const microphoneMuted = writable(false)
+export const dialogueActive = writable(false)
 export const microphoneMuteKnown = writable(false)
 export const lastRecognizedText = writable("")
 export const lastExecutedCommand = writable("")
@@ -52,6 +53,7 @@ export function connectIpc(port: number = 9712) {
     }
 
     ws.onclose = () => {
+        dialogueActive.set(false)
         ipcConnected.set(false)
         microphoneMuteKnown.set(false)
         jarvisState.set("disconnected")
@@ -84,6 +86,7 @@ function scheduleReconnect() {
 }
 
 export function disconnectIpc() {
+    dialogueActive.set(false)
     manualDisconnect = true
 
     if (reconnectTimer) {
@@ -107,6 +110,9 @@ function handleEvent(data: any) {
     console.log("IPC: Event", data.event, data)
 
     switch (data.event) {
+        case "dialogue_mode":
+            dialogueActive.set(Boolean(data.active))
+            break
         case "center_command":
             window.dispatchEvent(new CustomEvent("jarvis-center-command", { detail: data.text || "" }));
             break;

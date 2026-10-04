@@ -2,7 +2,7 @@ use crate::AppState;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::Duration;
-use jarvis_core::chat::{is_news_request, needs_live_info};
+use jarvis_core::chat::needs_live_info;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ChatMessage {
@@ -29,21 +29,10 @@ pub struct ChatConfig {
 
 #[tauri::command]
 pub fn chat_search_web(query: String) -> Result<String, String> {
-    let query = query.trim();
-    if query.is_empty() || query.len() > 500 { return Err("Некорректный запрос поиска".into()); }
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(20)).build().map_err(|e| e.to_string())?;
-    let url = reqwest::Url::parse_with_params("https://html.duckduckgo.com/html/", &[("q", query)])
-        .map_err(|e| format!("Некорректный запрос поиска: {e}"))?;
-    let response = client.get(url).header("User-Agent", "Mozilla/5.0 Jarvis/1.0")
-        .send().map_err(|e| format!("Поиск недоступен: {e}"))?
-        .error_for_status().map_err(|e| format!("Поиск вернул ошибку: {e}"))?;
-    let html = response
-        .text().map_err(|e| format!("Не удалось прочитать выдачу: {e}"))?;
-    let facts = extract_search_snippets(&html);
-    if facts.is_empty() { return Err("Поиск не вернул сниппеты. Попробуй другой запрос или выключи WEB INTEL.".into()); }
-    Ok(facts.join("\n\n"))
+    jarvis_core::chat::search_web(&query)
 }
 
+#[cfg(test)]
 fn extract_search_snippets(html: &str) -> Vec<String> {
     let mut facts = Vec::new();
     let mut rest = html;
@@ -150,15 +139,8 @@ fn send_chat(state: &AppState, client_messages: Vec<ChatMessage>, use_web_search
     let mut source_footer = String::new();
     if use_web_search || needs_live_info(&latest) {
         let now = chrono::Local::now().to_rfc3339();
-        let facts = if is_news_request(&latest) {
-            let items = super::news::fetch_news()?;
-            source_footer = items.iter().take(4).map(|item| format!("{} ({}) — {}", item.source, item.published_at, item.url)).collect::<Vec<_>>().join("\n");
-            items.iter().take(10).map(|item| format!("{} | {} | {} | {}", item.source, item.published_at, item.title, item.url)).collect::<Vec<_>>().join("\n")
-        } else {
-            let results = chat_search_web(messages.last().unwrap().content.clone())?;
-            source_footer = results.lines().filter(|line| line.starts_with("Источник: ")).take(4).collect::<Vec<_>>().join("\n");
-            results
-        };
+        let facts = chat_search_web(messages.last().unwrap().content.clone())?;
+        source_footer = facts.split_whitespace().filter(|part| part.starts_with("https://")).take(4).collect::<Vec<_>>().join("\n");
         messages.last_mut().unwrap().content.push_str(&format!("\n\nТекущая дата: {now}. Ниже результаты свежего поиска. Используй их для ответа; называй источник, ссылку и дату публикации, если дата указана. Не выдумывай отсутствующие даты или факты. Если данных недостаточно, скажи об этом.\n{facts}"));
     }
     let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(90)).build().map_err(|e| e.to_string())?;
@@ -168,12 +150,14 @@ fn send_chat(state: &AppState, client_messages: Vec<ChatMessage>, use_web_search
         let model = state.settings.read("deepseek_chat_model").unwrap_or_else(|| "deepseek-flash".into());
         let response = client.post("https://api.deepseek.com/chat/completions")
             .bearer_auth(key.trim())
-            .json(&json!({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 700, "stream": true}))
+            .json(&json!({"model": model, "messages": messages, "temperature": 0.7, "max_tokens": 700, "stream": true,
+                "thinking": {"type": "disabled"}}))
             .send().map_err(|e| format!("DeepSeek недоступен: {e}"))?;
         let speak = state.settings.read("chat_speak_responses").map(|v| v != "false").unwrap_or(true);
         let generation = jarvis_core::tts::generation();
-        let content = jarvis_core::chat::read_chat_stream(response, true, |_| {})?;
-        if speak && generation == jarvis_core::tts::generation() { jarvis_core::tts::speak(&speech_text(&content)); }
+        let content = jarvis_core::chat::read_chat_stream(response, true, |sentence| {
+            if speak && generation == jarvis_core::tts::generation() { jarvis_core::tts::speak(&speech_text(sentence)); }
+        })?;
         if content.is_empty() { return Err("DeepSeek вернул пустой ответ".into()); }
         Ok(ChatReply { content: with_sources(content, &source_footer), provider, model })
     } else {
@@ -183,8 +167,9 @@ fn send_chat(state: &AppState, client_messages: Vec<ChatMessage>, use_web_search
             .send().map_err(|_| "Локальный Ollama не запущен. Установи Ollama и выполни команду загрузки модели ниже.".to_string())?;
         let speak = state.settings.read("chat_speak_responses").map(|v| v != "false").unwrap_or(true);
         let generation = jarvis_core::tts::generation();
-        let content = jarvis_core::chat::read_ollama_reply(response, |_| {})?;
-        if speak && generation == jarvis_core::tts::generation() { jarvis_core::tts::speak(&speech_text(&content)); }
+        let content = jarvis_core::chat::read_ollama_reply(response, |sentence| {
+            if speak && generation == jarvis_core::tts::generation() { jarvis_core::tts::speak(&speech_text(sentence)); }
+        })?;
         if content.is_empty() { return Err("Локальная модель вернула пустой ответ".into()); }
         Ok(ChatReply { content: with_sources(content, &source_footer), provider, model })
     }

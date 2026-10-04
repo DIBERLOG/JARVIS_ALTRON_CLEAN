@@ -9,6 +9,8 @@ use rand::seq::SliceRandom;
 use crate::{microphone_muted, should_stop};
 
 static DIALOGUE_MODE: AtomicBool = AtomicBool::new(false);
+
+pub fn dialogue_active() -> bool { DIALOGUE_MODE.load(Ordering::SeqCst) }
 static CHAIN_LISTENING: AtomicBool = AtomicBool::new(false);
 static LAST_COMMAND: Mutex<Option<String>> = Mutex::new(None);
 static DIALOGUE_HISTORY: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
@@ -53,13 +55,21 @@ impl CommandDispatcher {
 }
 
 fn dialogue_start_phrase(text: &str) -> bool {
-    matches!(dialogue_phrase(text), "давай пообщаемся" | "давай поговорим" | "включи диалоговый режим")
+    matches!(dialogue_phrase(text), "давай пообщаемся" | "давай поговорим" | "включи диалоговый режим" |
+        "поговорим" | "пообщаемся" | "начни разговор" | "включи разговор" | "разговорный режим" |
+        "включи разговорный режим" | "хочу поговорить" | "давай поболтаем" | "поболтаем" | "включи диалог")
+}
+
+fn dialogue_command_phrase(id: &str) -> Option<&'static str> {
+    match id { "dialogue_start" => Some("давай поговорим"), "dialogue_stop" => Some("закончи разговор"), _ => None }
 }
 
 fn dialogue_stop_phrase(text: &str) -> bool {
     matches!(dialogue_phrase(text), "закончи разговор" | "закончим разговор" |
         "хватит общаться" | "выключи диалоговый режим" |
-        "закрой диалог" | "режим команд")
+        "закрой диалог" | "режим команд" | "отмени разговор" | "отмена разговора" |
+        "хватит разговаривать" | "заверши разговор" | "останови разговор" | "выключи разговор" |
+        "выключи разговорный режим" | "вернись в режим команд" | "стоп разговор" | "закончить разговор")
 }
 
 fn dialogue_phrase(text: &str) -> &str {
@@ -69,10 +79,19 @@ fn dialogue_phrase(text: &str) -> &str {
 #[cfg(test)]
 mod dialogue_tests {
     use super::{dialogue_start_phrase, dialogue_stop_phrase};
+    #[test]
+    fn intent_matches_use_real_dialogue_actions() {
+        assert!(dialogue_start_phrase(super::dialogue_command_phrase("dialogue_start").unwrap()));
+        assert!(dialogue_stop_phrase(super::dialogue_command_phrase("dialogue_stop").unwrap()));
+        assert_eq!(super::dialogue_command_phrase("weather"), None);
+    }
 
     #[test]
     fn start_and_exit_phrases_accept_terminal_punctuation() {
         assert!(dialogue_start_phrase("давай пообщаемся!"));
+        assert!(dialogue_start_phrase("давай поболтаем"));
+        assert!(dialogue_start_phrase("хочу поговорить"));
+        assert!(dialogue_stop_phrase("вернись в режим команд"));
         assert!(dialogue_stop_phrase("закрой диалог."));
         assert!(dialogue_stop_phrase("режим команд"));
         assert!(!dialogue_stop_phrase("расскажи про режим команд"));
@@ -536,7 +555,10 @@ fn process_text_command(text: &str, dispatcher: &CommandDispatcher) {
 
 // Execute command, returns true if chaining should continue
 fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
+    let normalized = if center_pending() { text.to_owned() } else { commands::center::normalize_phrase(text) };
+    let text = normalized.as_str();
     if text == "отмена" || text == "отмени" {
+        if !center_pending() && dialogue_active() { return execute_command("закончи разговор", rt); }
         CENTER_PENDING.store(false, Ordering::SeqCst);
         ipc::send(IpcEvent::CenterCommand { text: "отмена".into() });
         return false;
@@ -549,6 +571,7 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
     let language = i18n::get_language();
     if dialogue_start_phrase(text) {
         DIALOGUE_MODE.store(true, Ordering::SeqCst);
+        ipc::send(IpcEvent::DialogueMode { active: true });
         if let Ok(mut history) = DIALOGUE_HISTORY.lock() { history.clear(); }
         if !voices::play_command_reply("dialogue_start", &language) {
             tts::speak("Слушаю, сэр.");
@@ -559,6 +582,7 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
     }
     if DIALOGUE_MODE.load(Ordering::SeqCst) && dialogue_stop_phrase(text) {
         DIALOGUE_MODE.store(false, Ordering::SeqCst);
+        ipc::send(IpcEvent::DialogueMode { active: false });
         if let Ok(mut history) = DIALOGUE_HISTORY.lock() { history.clear(); }
         if !voices::play_command_reply("dialogue_stop", &language) {
             tts::speak("Как скажете, сэр. Возвращаюсь в режим команд.");
@@ -588,23 +612,25 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
     } else {
         None
     };
-    if in_dialogue && dialogue_command.is_none() {
+    let explicit_web_search = ["найди в интернете", "поищи в интернете", "найти в интернете", "проверь в сети", "найди в сети", "поищи в сети", "погугли", "загугли", "отыщи в интернете"]
+        .iter().any(|phrase| text.contains(phrase));
+    if (in_dialogue || explicit_web_search) && dialogue_command.is_none() && exact_command.is_none() {
         let response_started = std::time::Instant::now();
-        let history = DIALOGUE_HISTORY.lock().map(|saved| saved.clone()).unwrap_or_default();
+        let history = if in_dialogue { DIALOGUE_HISTORY.lock().map(|saved| saved.clone()).unwrap_or_default() } else { Vec::new() };
         match jarvis_core::chat::ask_spoken(text, &history) {
             Ok(answer) => {
                 info!("Voice latency: chat response queued after {} ms", response_started.elapsed().as_millis());
-                if let Ok(mut saved) = DIALOGUE_HISTORY.lock() {
+                if let Ok(mut saved) = DIALOGUE_HISTORY.lock() { if in_dialogue {
                     saved.push((text.to_string(), answer.clone()));
                     let excess = saved.len().saturating_sub(8);
                     if excess > 0 { saved.drain(..excess); }
-                }
-                return true;
+                } }
+                return in_dialogue;
             }
             Err(error) => {
                 warn!("Dialogue chat failed: {}", error);
                 tts::speak(&format!("Не удалось получить ответ: {error}"));
-                return true;
+                return in_dialogue;
             }
         }
     }
@@ -620,6 +646,12 @@ fn execute_command(text: &str, rt: &tokio::runtime::Handle) -> bool {
     
     if let Some((cmd_path, cmd_config)) = cmd_result {
         info!("Command found: {:?}", cmd_path);
+
+        // Intent/fuzzy matches must change the same state as exact phrases.
+        // The manifest has no Lua action to activate/deactivate the dialogue.
+        if let Some(phrase) = dialogue_command_phrase(&cmd_config.id) {
+            if cmd_config.id == "dialogue_start" || dialogue_active() { return execute_command(phrase, rt); }
+        }
 
         if cmd_config.id == "repeat_command" {
             let previous = LAST_COMMAND.lock().ok().and_then(|saved| saved.clone());

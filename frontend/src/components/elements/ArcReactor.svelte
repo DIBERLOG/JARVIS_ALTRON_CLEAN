@@ -1,7 +1,8 @@
 <script lang="ts">
     import { jarvisState } from "@/stores"
+    import { dialogueActive, microphoneMuted } from "@/lib/ipc"
 
-    $: stateClass = {
+    $: stateClass = $jarvisState === 'disconnected' ? 'disconnected' : $microphoneMuted ? 'idle' : $dialogueActive ? 'active' : {
         'disconnected': 'disconnected',
         'idle': 'idle',
         'listening': 'active',
@@ -9,7 +10,7 @@
     }[$jarvisState] || 'disconnected'
 </script>
 
-<div id="arc-reactor" class="reactor-container {stateClass} arc-cyan">
+<div id="arc-reactor" class="reactor-container {stateClass} arc-cyan" role="img" aria-label={$dialogueActive ? ($microphoneMuted ? 'Разговор включён, микрофон выключен' : 'Разговор активен') : 'Режим команд'}>
     <div class="reactor-container-inner circle abs-center">
         <ul class="marks">
             {#each Array(60) as _, i}
@@ -606,6 +607,11 @@
         opacity: 1;
         transform: translate(-50%, -50%) scale(1.1);
         animation: bg-pulse 3s ease-in-out infinite;
+    }
+
+    // Waiting/disconnected states retain their fade/scale transitions, not rotation.
+    .reactor-container:not(.active) {
+        .semi_arc_3, .coil-container { animation-play-state: paused; }
     }
 
     @keyframes bg-pulse {

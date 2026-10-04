@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import sys
+import time
 from contextlib import redirect_stdout
 import os
 import shutil
@@ -21,6 +22,9 @@ from XttsSpeak import add_ffmpeg_dll_path
 
 
 def main() -> int:
+    # Both neural engines cannot fit in an 8 GB GPU simultaneously.
+    from S2Speak import release_model
+    release_model()
     # Rust sends UTF-8 JSON through pipes; Windows' locale encoding corrupts Russian.
     if hasattr(sys.stdin, "reconfigure"):
         sys.stdin.reconfigure(encoding="utf-8")
@@ -76,8 +80,10 @@ def main() -> int:
     profile = f"{args.checkpoint.resolve()}:{args.checkpoint.stat().st_mtime_ns}:{references[0].stat().st_mtime_ns}:28:.42:.72:1.0"
 
     def speak(text):
+        started = time.perf_counter()
         key = hashlib.sha256((profile + text).encode("utf-8")).hexdigest()
         polished = audio_cache / (key + ".wav")
+        cache_hit = polished.is_file()
         if not polished.is_file():
             torch.manual_seed(28)
             with redirect_stdout(sys.stderr):
@@ -86,13 +92,25 @@ def main() -> int:
             temporary = polished.with_suffix(".tmp.wav")
             sf.write(temporary, generated["wav"], 24000, subtype="PCM_16")
             temporary.replace(polished)
+        prepared_ms = round((time.perf_counter() - started) * 1000, 1)
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(polished, args.output)
         if not args.no_play:
             audio, sample_rate = sf.read(polished, dtype="float32")
+            # Let the output device drain the last phoneme before closing playback.
+            # Only playback is padded; the cached/exported voice stays unchanged.
+            import numpy as np
+            audio = np.pad(audio, (0, round(sample_rate * .08)))
             from AudioOutput import select_output
             sd.play(audio, samplerate=sample_rate, device=select_output(sd))
+            try:
+                with (audio_cache.parent / "speech-latency.jsonl").open("a", encoding="utf-8") as log:
+                    log.write(json.dumps({"time": time.time(), "pid": os.getpid(), "characters": len(text),
+                        "cache_hit": cache_hit, "synthesis_ms": prepared_ms,
+                        "playback_started_ms": round((time.perf_counter() - started) * 1000, 1)}) + "\n")
+            except OSError:
+                pass
             sd.wait()
     if args.server:
         print("READY", flush=True)

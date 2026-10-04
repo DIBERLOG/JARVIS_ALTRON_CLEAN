@@ -39,12 +39,12 @@ pub fn web_evidence_prompt() -> &'static str { WEB_EVIDENCE }
 
 pub fn is_news_request(text: &str) -> bool {
     let text = text.to_lowercase();
-    ["новост", "событи", "сводк", "news"].iter().any(|word| text.contains(word))
+    ["новост", "событи", "сводк", "что нового", "news"].iter().any(|word| text.contains(word))
 }
 
 pub fn needs_live_info(text: &str) -> bool {
     let text = text.to_lowercase();
-    is_news_request(&text) || ["сегодня", "сейчас", "последн", "актуальн", "свеж", "вчера", "завтра", "2026", "курс валют", "погода"].iter().any(|word| text.contains(word))
+    is_news_request(&text) || ["сегодня", "сейчас", "последн", "актуальн", "свеж", "вчера", "завтра", "2026", "курс валют", "погода", "в интернете", "в сети", "найди", "найти", "поищи", "проверь", "погугли", "загугли", "отыщи", "экономик"].iter().any(|word| text.contains(word))
 }
 
 #[cfg(feature = "lua")]
@@ -59,8 +59,9 @@ pub fn ask_with_history(text: &str, history: &[(String, String)]) -> Result<Stri
 
 #[cfg(feature = "lua")]
 pub fn ask_spoken(text: &str, history: &[(String, String)]) -> Result<String, String> {
+    let generation = crate::tts::generation();
     let answer = ask_with_history_options(text, history, false)?;
-    crate::tts::speak(&answer);
+    if generation == crate::tts::generation() { crate::tts::speak(&answer); }
     Ok(answer)
 }
 
@@ -73,8 +74,14 @@ fn ask_with_history_options(text: &str, history: &[(String, String)], spoken: bo
         .or_else(|| DB.get().map(|db| db.read().clone()))
         .ok_or("Настройки чата не готовы")?;
     let provider=s.chat_provider; let local=s.local_chat_model; let remote=s.deepseek_chat_model; let key=s.api_keys.deepseek; let persona=s.voice_dialogue_personality;
-    let system_prompt = format!("{}\n{}", persona_prompt(&persona), web_evidence_prompt());
-    let live_context = if needs_live_info(text) { Some(voice_live_context(text)?) } else { None };
+    let mut system_prompt = format!("{}\n{}", persona_prompt(&persona), web_evidence_prompt());
+    system_prompt.push_str("\nДля голосового разговора обычно отвечай в 2–3 коротких предложениях. Если пользователь просит подробно, объясняй подробнее. При приложенных результатах поиска отвечай по ним, не утверждай, что доступ к интернету отсутствует. При ошибке поиска честно сообщи, что именно этот поиск не удался.");
+    let live_context = if needs_live_info(text) {
+        Some(voice_live_context(text).unwrap_or_else(|error| {
+            log::warn!("Voice web search failed: {error}");
+            format!("Поиск не удался: {error}. Свежие факты не подтверждены; не выдумывай результаты поиска.")
+        }))
+    } else { None };
     let user_text = match live_context {
         Some(context) => format!("{text}\n\nТекущая дата: {}. Свежие данные из интернета (ссылки не диктуй вслух, но назови источник и дату):\n{context}", chrono::Local::now().to_rfc3339()),
         None => text.to_string(),
@@ -96,7 +103,8 @@ fn ask_with_history_options(text: &str, history: &[(String, String)], spoken: bo
     {
         if key.trim().is_empty() { return Err("Ключ DeepSeek не задан".into()); }
         let response = client.post("https://api.deepseek.com/chat/completions").bearer_auth(key.trim())
-            .json(&json!({"model":remote,"messages":messages,"temperature":0.65,"max_tokens":400,"stream":true}))
+            .json(&json!({"model":remote,"messages":messages,"temperature":0.65,"max_tokens":400,"stream":true,
+                "thinking":{"type":"disabled"}}))
             .send().map_err(|e|e.to_string())?;
         return read_chat_stream(response, true, |sentence| { if spoken && speech_generation == crate::tts::generation() { crate::tts::speak(sentence); } });
     }
@@ -129,7 +137,7 @@ pub fn read_chat_stream(response: reqwest::blocking::Response, sse: bool, mut se
         if let Some(piece) = piece {
             answer.push_str(piece);
             pending.push_str(piece);
-            while let Some(end) = sentence_boundary(&pending) {
+            while let Some(end) = speech_block_boundary(&pending) {
                 let part: String = pending.drain(..end).collect();
                 if !part.trim().is_empty() { sentence(part.trim()); }
             }
@@ -148,15 +156,50 @@ pub fn sentence_boundary(text: &str) -> Option<usize> {
         if matches!(ch, '.' | '!' | '?' | '\n') && text[end..].chars().next().is_some_and(char::is_whitespace) {
             return Some(end);
         }
-        if index >= 350 && ch.is_whitespace() { return Some(end); }
     }
     None
 }
 
-#[cfg(feature = "lua")]
+// Keep short sentences together so XTTS can carry intonation across their join.
+// Never force a cut at an arbitrary word: this can damage phrase endings.
+pub fn speech_block_boundary(text: &str) -> Option<usize> {
+    let first = sentence_boundary(text)?;
+    if text[..first].chars().count() >= 120 { return Some(first); }
+    sentence_boundary(&text[first..]).map(|second| first + second)
+}
+
+pub fn search_query(text: &str) -> String {
+    text.to_lowercase().replace('ё', "е").split_whitespace()
+        .filter(|word| !["джарвис", "найди", "найти", "поищи", "погугли", "загугли", "отыщи", "можешь", "проверь", "пожалуйста", "расскажи", "покажи", "мне", "про", "в", "интернете", "сети", "давай", "кратко", "о", "что", "мире", "самые"].contains(&word.trim_matches(|ch: char| ch.is_ascii_punctuation())))
+        .collect::<Vec<_>>().join(" ")
+}
+
+#[cfg(feature = "web-search")]
+pub fn search_web(query: &str) -> Result<String, String> {
+    if query.trim().is_empty() || query.chars().count() > 500 { return Err("Некорректный запрос поиска".into()); }
+    voice_live_context(query)
+}
+
+#[cfg(feature = "web-search")]
 fn voice_live_context(query: &str) -> Result<String, String> {
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(10)).build().map_err(|e| e.to_string())?;
-    if is_news_request(query) {
+    let news_request = is_news_request(query);
+    let cleaned = search_query(query);
+    let query = cleaned.as_str();
+    if query.trim().is_empty() { return Err("Назовите тему поиска".into()); }
+    let client = reqwest::blocking::Client::builder().no_proxy().user_agent("Mozilla/5.0").timeout(std::time::Duration::from_secs(10)).build().map_err(|e| e.to_string())?;
+    if news_request {
+        let news_client = reqwest::blocking::Client::builder().user_agent("Mozilla/5.0").timeout(std::time::Duration::from_secs(6)).build().map_err(|e| e.to_string())?;
+        // Search the requested topic, not unrelated headlines from general feeds.
+        let news_url = reqwest::Url::parse_with_params("https://news.google.com/rss/search", &[("q", query), ("hl", "ru"), ("gl", "RU"), ("ceid", "RU:ru")])
+            .map_err(|e| e.to_string())?;
+        if let Ok(xml) = news_client.get(news_url).send().and_then(|r| r.error_for_status()).and_then(|r| r.text()) {
+            if let Ok(items) = voice_feed_items("Google News", &xml) {
+                if !items.is_empty() { return Ok(items.join("\n")); }
+            }
+        }
+    }
+    let specific_topic = ["нейросет", "искусствен", "нейро", "игр", "экономик", "политик", "спорт"].iter().any(|topic| query.to_lowercase().contains(topic));
+    if news_request && !specific_topic {
         let feeds = [
             ("Интерфакс", "https://www.interfax.ru/rss.asp"),
             ("Лента.ру", "https://lenta.ru/rss/news"),
@@ -165,8 +208,15 @@ fn voice_live_context(query: &str) -> Result<String, String> {
         ];
         let mut lines = Vec::new();
         let mut errors = Vec::new();
-        for (source, url) in feeds {
-            match client.get(url).send().and_then(|r| r.error_for_status()).and_then(|r| r.text()) {
+        let results = std::thread::scope(|scope| {
+            let handles: Vec<_> = feeds.into_iter().map(|(source, url)| {
+                let client = &client;
+                scope.spawn(move || (source, client.get(url).send().and_then(|r| r.error_for_status()).and_then(|r| r.text())))
+            }).collect();
+            handles.into_iter().filter_map(|handle| handle.join().ok()).collect::<Vec<_>>()
+        });
+        for (source, result) in results {
+            match result {
                 Ok(xml) => match voice_feed_items(source, &xml) {
                     Ok(items) if !items.is_empty() => lines.extend(items.into_iter().take(2)),
                     Ok(_) => errors.push(format!("{source}: нет публикаций с датой")),
@@ -180,7 +230,7 @@ fn voice_live_context(query: &str) -> Result<String, String> {
     }
     let url = reqwest::Url::parse_with_params("https://html.duckduckgo.com/html/", &[("q", query)])
         .map_err(|e| e.to_string())?;
-    let html = client.get(url).header("User-Agent", "Mozilla/5.0 Jarvis/1.0")
+    let html = client.get(url)
         .send().and_then(|r| r.error_for_status()).and_then(|r| r.text())
         .map_err(|e| format!("Веб-поиск недоступен: {e}"))?;
     let mut rest = html.as_str();
@@ -206,7 +256,7 @@ fn voice_live_context(query: &str) -> Result<String, String> {
             '>' => { in_tag = false; false },
             _ => !in_tag,
         }).collect();
-        if let Some(link) = link {
+        if let Some(link) = link.filter(|url| !crate::news_filter::excluded_publisher("", "", url)) {
             let snippet = plain.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'");
             if snippet.chars().count() > 20 { lines.push(format!("{} | Источник: {link}", snippet.split_whitespace().collect::<Vec<_>>().join(" "))); }
         }
@@ -216,7 +266,40 @@ fn voice_live_context(query: &str) -> Result<String, String> {
     Ok(lines.join("\n"))
 }
 
-#[cfg(feature = "lua")]
+#[cfg(all(feature = "web-search", test))]
+fn voice_search_items(xml: &str) -> Result<Vec<String>, String> {
+    use quick_xml::{events::Event, name::QName, Reader};
+    let mut reader = Reader::from_str(xml);
+    let (mut title, mut link, mut snippet) = (String::new(), String::new(), String::new());
+    let (mut in_item, mut results) = (false, Vec::new());
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) if e.name() == QName(b"item") => {
+                in_item = true; title.clear(); link.clear(); snippet.clear();
+            }
+            Ok(Event::Start(e)) if in_item && matches!(e.name().as_ref(), b"title" | b"link" | b"description") => {
+                let name = e.name();
+                let raw = reader.read_text(name).map_err(|e| e.to_string())?;
+                let value = quick_xml::escape::unescape(raw.trim()).map_err(|e| e.to_string())?.into_owned();
+                match name.as_ref() { b"title" => title = value, b"link" => link = value, _ => snippet = value }
+            }
+            Ok(Event::End(e)) if e.name() == QName(b"item") => {
+                in_item = false;
+                if !title.is_empty() && link.starts_with("https://")
+                    && !crate::news_filter::excluded_publisher(&title, "", &link) {
+                    results.push(format!("{title}: {snippet} | Источник: {link} | Дата публикации не указана"));
+                }
+                if results.len() >= 4 { break; }
+            }
+            Ok(Event::Eof) => break,
+            Err(error) => return Err(error.to_string()),
+            _ => {}
+        }
+    }
+    Ok(results)
+}
+
+#[cfg(feature = "web-search")]
 fn voice_feed_items(source: &str, xml: &str) -> Result<Vec<String>, String> {
     use quick_xml::{events::Event, name::QName, Reader};
     let mut reader = Reader::from_str(xml);
@@ -267,6 +350,9 @@ mod tests {
         assert_eq!(super::sentence_boundary("Здравствуйте, сэр. Следующий ответ"), Some("Здравствуйте, сэр.".len()));
         assert_eq!(super::sentence_boundary("Вес 72.5 кг"), None);
         assert_eq!(super::sentence_boundary("Ответ ещё не закончен"), None);
+        assert_eq!(super::speech_block_boundary("Здравствуйте, сэр. Следующий ответ"), None);
+        assert_eq!(super::speech_block_boundary("Здравствуйте, сэр. Я на связи. Дальше"), Some("Здравствуйте, сэр. Я на связи.".len()));
+        assert_eq!(super::speech_block_boundary(&"длинная фраза без окончания ".repeat(30)), None);
     }
     #[cfg(feature = "lua")]
     #[test]
@@ -294,7 +380,7 @@ mod tests {
             let mut sentences = Vec::new();
             let answer = super::read_chat_stream(response, sse, |part| sentences.push(part.to_owned())).unwrap();
             assert_eq!(answer, "Здравствуйте, сэр. Я на связи.");
-            assert_eq!(sentences, ["Здравствуйте, сэр.", "Я на связи."]);
+            assert_eq!(sentences, ["Здравствуйте, сэр. Я на связи."]);
             server.join().unwrap();
         }
     }
@@ -305,6 +391,10 @@ mod tests {
         assert!(web_evidence_prompt().contains("источник"));
         assert!(needs_live_info("Какие новости сегодня?"));
         assert!(is_news_request("Новости мира"));
+        assert!(needs_live_info("Найди в интернете прохождение игры"));
+        assert!(needs_live_info("Проверь в сети эту информацию"));
+        assert!(!needs_live_info("Объясни закон Ома"));
+        assert_eq!(super::search_query("Найди в интернете последние новости нейросетей пожалуйста"), "последние новости нейросетей");
     }
     #[cfg(feature = "lua")]
     #[test]
@@ -313,5 +403,30 @@ mod tests {
         let news = super::voice_live_context("Расскажи новости сегодня").unwrap();
         assert!(news.contains("https://"));
         assert!(!news.contains("CDATA"));
+    }
+    #[cfg(feature = "lua")]
+    #[test]
+    fn search_rss_preserves_sources_without_inventing_dates() {
+        let results = super::voice_search_items("<rss><channel><item><title>Rust &amp; tools</title><link>https://www.rust-lang.org/</link><description>Official site</description></item></channel></rss>").unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].contains("Rust & tools"));
+        assert!(results[0].contains("https://www.rust-lang.org/"));
+        assert!(results[0].contains("Дата публикации не указана"));
+    }
+    #[cfg(feature = "lua")]
+    #[test]
+    #[ignore = "requires live network access"]
+    fn voice_web_search_fetches_sources() {
+        let result = super::voice_live_context("Rust programming language official website").unwrap();
+        assert!(result.contains("https://"));
+        assert!(result.contains("Источник:"));
+    }
+    #[cfg(feature = "lua")]
+    #[test]
+    #[ignore = "requires live network access"]
+    fn neural_news_search_has_sources() {
+        let result = super::voice_live_context("Найди в интернете последние новости нейросетей").unwrap();
+        assert!(result.contains("https://"));
+        assert!(!result.trim().is_empty());
     }
 }

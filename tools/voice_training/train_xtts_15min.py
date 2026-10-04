@@ -24,6 +24,7 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=1e-6)
     parser.add_argument("--seconds", type=int)
     parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--dataset", type=Path)
     args = parser.parse_args()
     if not 1 <= args.minutes <= 15 or not 0 < args.learning_rate <= 1e-6:
         raise ValueError("Unsafe duration or learning rate")
@@ -60,6 +61,26 @@ def main():
                     and r["transcript"] == allowed[r["source"]]["text"]]
         if len(selected) < 16:
             raise RuntimeError(f"Too few reliable approved clips: {len(selected)}")
+        if args.dataset:
+            source = args.dataset.resolve()
+            selected = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
+            for row in selected:
+                row["transcript"] = row["transcript"].replace(", Са.", ", сэр.").replace(", са.", ", сэр.")
+                if "Открываю-ChatGPT" in row["source"]:
+                    row["transcript"] = row["transcript"].replace("Открываю счёт GPTSA.", "Открываю ChatGPT, сэр.")
+                if Path(row["source"]).name == "notes_open.mp3":
+                    row["transcript"] = row["transcript"].replace("Открываю ваши заметкися,", "Открываю ваши заметки, сэр.")
+            import soundfile as sf
+            if len(selected) < 16:
+                raise RuntimeError("Full dataset is incomplete")
+            for row in selected:
+                if Path(row["id"]).name != row["id"] or not row["transcript"].strip() or any(c in row["transcript"] for c in "|\r\n"):
+                    raise ValueError("Invalid dataset row")
+                duration = sf.info(str(source / "wavs" / (row["id"] + ".wav"))).duration
+                if not .3 <= duration <= 9.1 or len(row["transcript"]) > 195:
+                    raise ValueError("Dataset fragment exceeds training limits")
+            update(dataset_source=str(source), unique_sources=len({r["source_hash"] for r in selected}),
+                   transcript_quality="experimental local ASR; not manually verified")
         dataset = RUN / "dataset"
         (dataset / "wavs").mkdir(parents=True)
         for row in selected:

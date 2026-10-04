@@ -24,7 +24,7 @@ async function waitForNewsAction() {
 }
 type Pending = { kind: string; ids?: string[]; title?: string; id?: string }
 let pending: Pending | null = null
-const clean = (text: string) => text.toLowerCase().replace(/ё/g,'е').trim()
+const clean = (text: string) => text.toLowerCase().replace(/ё/g,'е').trim().replace(/[.!?,]+$/g,'').trim()
 export function spokenNumber(text: string): number | undefined {
     const numeric = text.match(/\b\d+\b/); if (numeric) return Number(numeric[0])
     const words = ['один','два','три','четыре','пять','шесть','семь','восемь','девять','десять','одиннадцать','двенадцать']
@@ -52,7 +52,7 @@ export function navigateCenter(section: string) { centerSection.set(section); wi
 async function save(data: CenterData) { await saveCenterData(data); centerRevision.update(value => value + 1) }
 export async function handleCenterVoice(raw: string) {
     const text = clean(raw)
-    if (text === 'отмена' || text === 'отмени') {pending = null; reply('Действие отменено, сэр.','action_cancelled'); return}
+    if (/^(отмена|отмени|отменить|не надо|не нужно|нет|не сохраняй|передумал)$/.test(text)) {pending = null; reply('Действие отменено, сэр.','action_cancelled'); return}
     if (pending) {
         const step = pending
         if(step.kind==='duration'){
@@ -107,7 +107,7 @@ export async function handleCenterVoice(raw: string) {
             pending={kind:'reminder-confirm',title:step.title,id:due.toISOString()};reply(`Создать напоминание ${step.title} на ${due.toLocaleString('ru-RU')}? Скажите да или отмена.`,'reminder_ask_confirm',true);return
         }
         if(step.kind==='reminder-confirm') {
-            if(!/^(да|подтверждаю|сохрани)$/.test(text)){reply('Скажите да для сохранения либо отмена.','confirm_again',true);return}
+            if(!/^(да|давай|ага|угу|конечно|хорошо|ладно|окей|ок|согласен|верно|все верно|подтверждаю|подтверди|сохрани|сохранить|да сохрани|да подтверждаю)$/.test(text)){reply('Скажите да для сохранения либо отмена.','confirm_again',true);return}
             data.reminders.push({id:makeId(),title:step.title!,dueAt:step.id!,done:false});await save(data);pending=null;reply('Напоминание сохранено, сэр.','reminder_saved');return
         }
         if(step.kind==='birthday-name'){pending={kind:'birthday-date',title:raw};reply('Назовите день и месяц цифрами: например, 12.04.','birthday_ask_date',true);return}

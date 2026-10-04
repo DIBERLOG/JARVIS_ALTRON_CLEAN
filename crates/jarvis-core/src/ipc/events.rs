@@ -26,6 +26,7 @@ pub enum IpcEvent {
     Notification { title: String, primary: String, detail: Option<String> },
 
     MicrophoneMuted { muted: bool },
+    DialogueMode { active: bool },
     
     // App started
     Started,

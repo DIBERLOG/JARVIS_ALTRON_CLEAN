@@ -151,6 +151,7 @@ fn main() -> Result<(), String> {
             }
             IpcAction::GetMuted => {
                 ipc::send(jarvis_core::ipc::IpcEvent::MicrophoneMuted { muted: microphone_muted() });
+                ipc::send(jarvis_core::ipc::IpcEvent::DialogueMode { active: app::dialogue_active() });
             }
             IpcAction::TextCommand { text } => {
                 info!("Received text command: {}", text);

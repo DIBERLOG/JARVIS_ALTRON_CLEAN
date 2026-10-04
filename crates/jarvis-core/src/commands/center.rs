@@ -2,7 +2,7 @@ use super::JCommand;
 
 // Only implemented Center actions are advertised. Parameter examples are handled by the voice bridge.
 pub fn available_commands() -> Vec<JCommand> {
-    serde_json::from_str(r#"[
+    let mut commands: Vec<JCommand> = serde_json::from_str(r#"[
   {
     "id": "center_open",
     "type": "center",
@@ -334,10 +334,61 @@ pub fn available_commands() -> Vec<JCommand> {
       ]
     }
   }
-]"#).expect("valid built-in Center command catalog")
+]"#).expect("valid built-in Center command catalog");
+    for command in &mut commands {
+        if let Some(phrases) = command.phrases.get_mut("ru") {
+            let originals = phrases.clone();
+            for phrase in originals {
+                phrases.push(format!("пожалуйста {phrase}"));
+                phrases.push(format!("{phrase} пожалуйста"));
+                for (verb, aliases) in [
+                    ("открой ", vec!["открыть ", "можешь открыть ", "перейди в "]),
+                    ("создай ", vec!["создать ", "можешь создать "]),
+                    ("обнови ", vec!["обновить ", "можешь обновить "]),
+                    ("переведи ", vec!["перевести ", "можешь перевести "]),
+                    ("отметь ", vec!["отметить ", "можешь отметить "]),
+                ] {
+                    if let Some(rest) = phrase.strip_prefix(verb) {
+                        phrases.extend(aliases.into_iter().map(|alias| format!("{alias}{rest}")));
+                    }
+                }
+            }
+            phrases.sort(); phrases.dedup();
+        }
+    }
+    commands
 }
+pub fn normalize_phrase(text: &str) -> String {
+    let mut text = text.to_lowercase().replace('ё', "е").replace("пожалуйста,", "пожалуйста").split_whitespace().collect::<Vec<_>>().join(" ");
+    text = text.trim_matches(|ch: char| ch.is_ascii_punctuation() || ch == '«' || ch == '»').to_string();
+    loop {
+        let prefix = ["пожалуйста ", "ты можешь ", "можешь ты ", "можешь ", "не мог бы ты ", "давай "]
+            .into_iter().find(|prefix| text.starts_with(prefix));
+        let Some(prefix) = prefix else { break; };
+        // "давай поговорим" is a dialogue action, not filler.
+        if prefix == "давай " && ["давай поговорим", "давай пообщаемся", "давай поболтаем"].contains(&text.as_str()) { break; }
+        text = text[prefix.len()..].trim().to_owned();
+    }
+    if let Some(without) = text.strip_suffix(" пожалуйста") { text = without.trim_end_matches(',').to_owned(); }
+    for (alias, canonical) in [
+        ("переключись на ", "открой "), ("перейди в ", "открой "), ("открыть ", "открой "),
+        ("запустить ", "запусти "), ("поставить таймер", "запусти таймер"), ("поставь таймер", "запусти таймер"), ("включи таймер", "запусти таймер"),
+        ("начни таймер", "запусти таймер"), ("обновить ", "обнови "), ("освежи ленту", "обнови ленту"),
+        ("перевести ", "переведи "), ("добавить ", "добавь "), ("создать ", "создай "),
+        ("сделай заметку", "создай заметку"), ("новая заметка", "создай заметку"),
+        ("поставь напоминание", "создай напоминание"), ("отметить ", "отметь "),
+        ("покажи календарь", "открой календарь"), ("покажи заметки", "открой заметки"),
+        ("покажи привычки", "открой привычки"), ("покажи новости", "открой новости"),
+    ] {
+        if let Some(rest) = text.strip_prefix(alias) {
+            if alias.ends_with(' ') || rest.is_empty() || rest.starts_with(' ') { return format!("{canonical}{rest}"); }
+        }
+    }
+    text
+}
+
 pub fn matches_phrase(text: &str) -> bool {
-    let normalized = text.to_lowercase().replace('ё', "е");
+    let normalized = normalize_phrase(text);
     available_commands().iter().any(|command|command.get_all_phrases().iter().any(|phrase|phrase.replace('ё',"е")==normalized))
 }
 #[cfg(test)]
@@ -349,6 +400,14 @@ mod tests {
         assert_eq!(commands.len(),ids.len());
         assert!(super::matches_phrase("обнови ленту"));
         assert!(!super::matches_phrase("открой браузер"));
+        assert!(super::matches_phrase("Пожалуйста, открой календарь!"));
+    }
+    #[test]
+    fn natural_variants_preserve_parameters_and_negation() {
+        assert_eq!(super::normalize_phrase("можешь поставить таймер"), "запусти таймер");
+        assert_eq!(super::normalize_phrase("пожалуйста поставь таймер на десять минут"), "запусти таймер на десять минут");
+        assert_eq!(super::normalize_phrase("открыть заметки пожалуйста"), "открой заметки");
+        assert_eq!(super::normalize_phrase("не создавай заметку"), "не создавай заметку");
+        assert!(super::matches_phrase("можешь открыть календарь"));
     }
 }
-

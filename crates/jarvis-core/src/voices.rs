@@ -13,6 +13,7 @@ pub use structs::*;
 static VOICES: OnceCell<Vec<structs::VoiceConfig>> = OnceCell::new();
 static CURRENT_VOICE_ID: OnceCell<RwLock<String>> = OnceCell::new();
 static LAST_JOKE_REPLY: Mutex<Option<PathBuf>> = Mutex::new(None);
+static LAST_COMMAND_REPLIES: once_cell::sync::Lazy<Mutex<std::collections::HashMap<String, PathBuf>>> = once_cell::sync::Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
 
 pub fn init(default_voice: &str, language: &str) -> Result<(), String> {
     let voices = scan_voices()?;
@@ -180,6 +181,18 @@ fn greeting_sounds(reactions: &structs::VoiceReactions, period: time::TimeOfDay)
 }
 
 pub fn play(reaction: structs::Reaction) {
+    let recorded = match reaction {
+        structs::Reaction::Reply => Some("reaction_reply"),
+        structs::Reaction::Ok => Some("reaction_ok"),
+        structs::Reaction::NotFound => Some("reaction_not_found"),
+        structs::Reaction::Greet => Some(match time::TimeOfDay::now() {
+            time::TimeOfDay::Morning => "greet_morning",
+            time::TimeOfDay::Day => "greet_day",
+            _ => "greet_evening",
+        }),
+        _ => None,
+    };
+    if recorded.is_some_and(|id| play_command_reply(id, &get_current_language())) { return; }
     let voice = match get_current_voice() {
         Some(v) => v,
         None => {
@@ -268,6 +281,10 @@ pub fn play_command_reply(command_id: &str, language: &str) -> bool {
         return false;
     }
     let reply_dir = SOUND_DIR.join("command-replies").join(language);
+    // Occasional light humour only for harmless actions, never errors or secrets.
+    if matches!(command_id, "news_open" | "note_saved" | "checklist_saved" | "timer_start" | "habit_marked" | "charge_open")
+        && rand::thread_rng().gen_ratio(1, 10)
+        && play_command_reply(&format!("{command_id}_ironic"), language) { return true; }
     if command_id == "jarvis_joke" {
         let mut jokes: Vec<PathBuf> = fs::read_dir(&reply_dir).ok().into_iter().flatten()
             .filter_map(|entry| entry.ok().map(|entry| entry.path()))
@@ -287,9 +304,22 @@ pub fn play_command_reply(command_id: &str, language: &str) -> bool {
         }
         return false;
     }
-    let path = reply_dir.join(format!("{command_id}.mp3"));
-    if !path.is_file() { return false; }
-    play(&path)
+    let mut paths: Vec<PathBuf> = fs::read_dir(&reply_dir).ok().into_iter().flatten()
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|path| path.extension().is_some_and(|ext| ext == "mp3"))
+        .filter(|path| path.file_stem().and_then(|s| s.to_str()).is_some_and(|stem|
+            stem == command_id || stem.strip_prefix(&format!("{command_id}__"))
+                .is_some_and(|number| number.parse::<u32>().is_ok())))
+        .collect();
+    paths.sort();
+    let previous = LAST_COMMAND_REPLIES.lock().get(command_id).cloned();
+    if let Some(path) = pick_without_repeat(&paths, previous.as_ref()) {
+        if play(&path) {
+            LAST_COMMAND_REPLIES.lock().insert(command_id.to_owned(), path);
+            return true;
+        }
+    }
+    false
 }
 
 fn pick_without_repeat(paths: &[PathBuf], previous: Option<&PathBuf>) -> Option<PathBuf> {

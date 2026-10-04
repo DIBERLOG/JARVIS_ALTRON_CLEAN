@@ -1,0 +1,1024 @@
+[
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-02-На-связи,-сэр.mp3",
+    "file": "reaction_reply__1.mp3",
+    "reply_id": "reaction_reply",
+    "sha256": "95262e5f8a36bde1acd1e58975b8771a8b34db85964575cc8e7d128c6043513e",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-02-Слушаю-вас,-сэр.mp3",
+    "file": "reaction_reply__2.mp3",
+    "reply_id": "reaction_reply",
+    "sha256": "0ec2209953e00b04344af80005bdb8d711c2d7d0bf4d1aa7ca38f5b3a7e6abcf",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-03-Готов,-сэр.-Каков-план.mp3",
+    "file": "reaction_reply__3.mp3",
+    "reply_id": "reaction_reply",
+    "sha256": "6d3f021918c7f2c88f4893961e410571825d1cb68a7b0dc826ddc99e7a1e1e8f",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-03-Да,-сэр.-Чем-займёмся.mp3",
+    "file": "reaction_reply__4.mp3",
+    "reply_id": "reaction_reply",
+    "sha256": "0e5fcc4616ddae9ac5b116d7ec42c5b82892f5bb5a8811cc612c80106930ff0e",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-03-К-вашим-услугам,-сэр.mp3",
+    "file": "reaction_reply__5.mp3",
+    "reply_id": "reaction_reply",
+    "sha256": "9bb44143f088b8d244ae6aec0b759e3474950b85126a2b0192b0c2c37dcb80ce",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-03-Я-здесь.-Говорите.mp3",
+    "file": "reaction_reply__6.mp3",
+    "reply_id": "reaction_reply",
+    "sha256": "775977188ba8d182d254ddc71b64a936a9c6e49c5f9e9a9f381ee80b484fb825",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-04-Доброе-утро,-сэр.-Начнём-спокойно-и-по-делу.mp3",
+    "file": "greet_morning__1.mp3",
+    "reply_id": "greet_morning",
+    "sha256": "fa633853ec6052a25b468f053f941de0fd501a529fb2d7f8e84f4c250fc60fa4",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-04-Добрый-вечер,-сэр.-Чем-могу-помочь.mp3",
+    "file": "greet_evening__1.mp3",
+    "reply_id": "greet_evening",
+    "sha256": "21f237195860bcd509b5a4cdfaadba340b0a14a5ccd26adeb9af3438838b9c41",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-04-Добрый-день,-сэр.-Я-готов-к-работе.mp3",
+    "file": "greet_day__1.mp3",
+    "reply_id": "greet_day",
+    "sha256": "3187d9f64260c793a21d8d6c0c33fdc59a7263bc947b7aa539d6d22bcf7ff3fa",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-05-Принято,-сэр.-Выполняю.mp3",
+    "file": "reaction_ok__1.mp3",
+    "reply_id": "reaction_ok",
+    "sha256": "31d282ffd83832d960dcf7e1100aebb377dbcc1a0a7ba931fbaffc05396a3f8c",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-05-Рад-вас-слышать,-сэр.-Что-сегодня-в-приоритете.mp3",
+    "file": "greet_evening__2.mp3",
+    "reply_id": "greet_evening",
+    "sha256": "285398b4b9ca2c26289b7acd2f2c1ca1fa3dff18964d7b9cd6b75df777b2c2da",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-05-С-возвращением,-сэр.-Продолжим.mp3",
+    "file": "greet_evening__3.mp3",
+    "reply_id": "greet_evening",
+    "sha256": "a8026d883602512861e97a8935bd30b1b357e35b09b7724b94917f5e331445c2",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-05-Хорошо,-сэр.-Сейчас-сделаю.mp3",
+    "file": "reaction_ok__2.mp3",
+    "reply_id": "reaction_ok",
+    "sha256": "dd2b6468e4c8f6843a141358eea9e9d19a188b697db8d1e8f8cfb6fdb36fd72d",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-06-Есть,-сэр.mp3",
+    "file": "reaction_ok__3.mp3",
+    "reply_id": "reaction_ok",
+    "sha256": "c6145a9f90ca4bcf7132c46b765fc5a3f35b18931a8f78715627bf38f9af7418",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-06-Займусь-этим,-сэр.mp3",
+    "file": "reaction_ok__4.mp3",
+    "reply_id": "reaction_ok",
+    "sha256": "7f0d546d4ee862fb4ecc2bcb2e7b37056bb40e5f5dbbdf068609c4cc972bbabb",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-06-Понял-вас.-Приступаю.mp3",
+    "file": "reaction_ok__5.mp3",
+    "reply_id": "reaction_ok",
+    "sha256": "247afa2450103f8886b77086d3c5e9be118236a17659147ad18fecd548ccec90",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-06-Сделаю,-сэр.-Без-лишней-суеты.mp3",
+    "file": "reaction_ok__6.mp3",
+    "reply_id": "reaction_ok",
+    "sha256": "c3dcd432080fd3f1e2ec531b5b9263a41e6995e71bcad2f05d05694e3293fd7a",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-07-Всё-готово.-Можно-продолжать.mp3",
+    "file": "library_82fa99070287__1.mp3",
+    "reply_id": "library_82fa99070287",
+    "sha256": "f99cde5d5dba45887069bad164de7893568ebfb0238587c9d91d225e5b97954e",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-07-Готово,-сэр.mp3",
+    "file": "library_78b2d6437634__1.mp3",
+    "reply_id": "library_78b2d6437634",
+    "sha256": "86f91b6c36b3941acae91b81dd7b97f26198a49e432e1bf018fd254739f341ab",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-07-Задача-выполнена,-сэр.mp3",
+    "file": "library_32a5258c2d1f__1.mp3",
+    "reply_id": "library_32a5258c2d1f",
+    "sha256": "cca2811fcccb00955aaea537d01b6445315b5e010e372658327ffae8b99f9147",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-07-Сделано,-сэр.-Изменения-сохранены.mp3",
+    "file": "library_6eab39dd2aae__1.mp3",
+    "reply_id": "library_6eab39dd2aae",
+    "sha256": "e46fd3e4be32d3c8077f2cc203f6f01ec68ad9f5beaaf15a56cd0be567e2c756",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-08-Назовите-номер-или-название,-сэр.mp3",
+    "file": "library_7e29c91d1e27__1.mp3",
+    "reply_id": "library_7e29c91d1e27",
+    "sha256": "91e4ce321033df9e2683d09d2729d1c2150295972e1a20b1016e100ceeb4034b",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-08-Порядок,-сэр.-Всё-на-своих-местах.mp3",
+    "file": "library_6777fd9ba786__1.mp3",
+    "reply_id": "library_6777fd9ba786",
+    "sha256": "3eed7e32f37ee0e4312d9be04b6133f2b8b0e42b447782728c72b813695b7294",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-08-Уточните,-пожалуйста,-сэр.-Что-именно-вы-хотите.mp3",
+    "file": "library_ed5fb804aafb__1.mp3",
+    "reply_id": "library_ed5fb804aafb",
+    "sha256": "17699f677711070968d49dadd076cb3183eed0ad4fd5e85add074185147f7472",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-09-Выберите-один-из-вариантов-на-экране,-сэр.mp3",
+    "file": "library_ba3684481ce2__1.mp3",
+    "reply_id": "library_ba3684481ce2",
+    "sha256": "c16289e2a3a7e8ea0e8ed6cb38b457b48c28fdbe412ac53e4c09a0fcd1411564",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-09-Не-совсем-расслышал,-сэр.-Повторите,-пожалуйста.mp3",
+    "file": "reaction_not_found__1.mp3",
+    "reply_id": "reaction_not_found",
+    "sha256": "924bf2a0c630ad525dde9263a026e20c20c5be77598e38eb2cb62c58ec68202c",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-09-Правильно-ли-я-понял-вас,-сэр.mp3",
+    "file": "library_e9ee1987615c__1.mp3",
+    "reply_id": "library_e9ee1987615c",
+    "sha256": "73b24843ac5c64f21e670670212cc72f9d0448f43e0a75749881704afd098d1b",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-09-Я-понял-только-часть-команды.-Скажите-её-ещё-раз.mp3",
+    "file": "reaction_not_found__2.mp3",
+    "reply_id": "reaction_not_found",
+    "sha256": "0937eee184a1898d37dfb5f0981fd6788fe3ae6191975112f73880b67a264d5c",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-10-Не-торопитесь,-сэр.-Я-дождусь-окончания-мысли.mp3",
+    "file": "library_a400d75dbde9__1.mp3",
+    "reply_id": "library_a400d75dbde9",
+    "sha256": "4815753efaa0e091c3447525a09df8652678db531bec5f0b7d9fc4401d8e36d8",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-10-Подтвердите-действие,-сэр.-Скажите-«да»-или-«отм.mp3",
+    "file": "confirm_again__1.mp3",
+    "reply_id": "confirm_again",
+    "sha256": "65518ded3493a416dad7da83fc4f6e577c89421e84b814c4445853792bb4a65e",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-10-Продолжайте,-сэр.-Я-слушаю.mp3",
+    "file": "library_df3ff69b517a__1.mp3",
+    "reply_id": "library_df3ff69b517a",
+    "sha256": "a53cd4205ddcb24847e0047026773cce0b730f95ae4edc9d91f8f88c53ca3017",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-11-Отменено,-сэр.-Ничего-не-изменено.mp3",
+    "file": "action_cancelled__1.mp3",
+    "reply_id": "action_cancelled",
+    "sha256": "d274cf7f8b4f3bde82f2ab6a6a639ead76711e5945f68791fce7d96e852e132a",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-11-Проверьте-данные-на-экране,-сэр.-Всё-верно.mp3",
+    "file": "confirm_again__2.mp3",
+    "reply_id": "confirm_again",
+    "sha256": "48ca01de1b94b3fca6378ac8c5027b6804fb896d24c9e313484d1aa83677e539",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-11-Хорошо,-сэр.-Оставляем-как-было.mp3",
+    "file": "action_cancelled__2.mp3",
+    "reply_id": "action_cancelled",
+    "sha256": "288ff4d40c645f507606fca6d04abef4ebf858fd57f1f824b2cfb69e69f9a6aa",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-11-Это-действие-изменит-сохранённые-данные.-Продолж.mp3",
+    "file": "library_178c403d7ef6__1.mp3",
+    "reply_id": "library_178c403d7ef6",
+    "sha256": "cd26f960d7eb3f561cff9fe4c8603110a724a2a035d0d6cacb527b00dec2cd5c",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-12-Обновляю-новости,-сэр.-Подождите-немного.mp3",
+    "file": "news_refresh__1.mp3",
+    "reply_id": "news_refresh",
+    "sha256": "62d2996acd5350d74b0b5f12423706881dd1c29a7c05eef63751b09291621bc4",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-12-Останавливаюсь,-сэр.mp3",
+    "file": "library_95d1009b021b__1.mp3",
+    "reply_id": "library_95d1009b021b",
+    "sha256": "87ef63f5dcc08ea09e6d3f457842e872566bad693a5c5f9987ef92c3b54e96ec",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-12-Открываю-вашу-новостную-ленту,-сэр.mp3",
+    "file": "news_open__1.mp3",
+    "reply_id": "news_open",
+    "sha256": "09e0764ef0f6426915c1ad843d6802d95afc25323238c9262139a75f56751ea8",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-12-Посмотрим,-что-произошло,-сэр.mp3",
+    "file": "news_open__2.mp3",
+    "reply_id": "news_open",
+    "sha256": "1a37abf32f9153920c1d23c4496f06b84546df1402aae55f0356ac77233b9f76",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-13-Готово,-сэр.-Перевод-уже-на-экране.mp3",
+    "file": "news_translation_done__1.mp3",
+    "reply_id": "news_translation_done",
+    "sha256": "bcd61ea96b16cd6c4cbe780e8f9b23caee360119c632a16d08fcd8b5921116f6",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-13-Запрашиваю-свежую-ленту,-сэр.mp3",
+    "file": "news_refresh__2.mp3",
+    "reply_id": "news_refresh",
+    "sha256": "13fb2c803bd4d9323ffa29496d215fbf2fbcf9722c9138f90c0c6ec0aa678bd5",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-13-Какую-новость-открыть,-сэр-Назовите-её-номер.mp3",
+    "file": "library_0ca5babf5bcd__1.mp3",
+    "reply_id": "library_0ca5babf5bcd",
+    "sha256": "479496a5f506161bc3ee07e122b0e4009cd36d0468d48aa8afc3c6c398134dfd",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-13-Перевожу-выбранную-новость,-сэр.mp3",
+    "file": "news_translate__1.mp3",
+    "reply_id": "news_translate",
+    "sha256": "909363d0d6a05d3f04591f194ecde80fb47faae340a1ff4ca33df3ae03a84559",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-14-Выберите-регион,-сэр.-Я-покажу-доступные-источни.mp3",
+    "file": "library_dac34c5e93e7__1.mp3",
+    "reply_id": "library_dac34c5e93e7",
+    "sha256": "02eec4cab694bb338c24b5a0d85ebff113966627913d74034aa09ca930773f52",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-14-Какой-раздел-вас-интересует,-сэр.mp3",
+    "file": "library_bb6825618d7b__1.mp3",
+    "reply_id": "library_bb6825618d7b",
+    "sha256": "f58a7222ca19e96cdf74d8c1eb6c33f133559b7d35a3c7297136411197725a35",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-14-Новости-подождут,-сэр.-Если-захотите-—-вернёмся.mp3",
+    "file": "library_14685431425b__1.mp3",
+    "reply_id": "library_14685431425b",
+    "sha256": "cef3a316985f8b9d77ed607233bd8e9b23fa8041b2260a45e6b1100640a73daa",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-15-Открываю-календарь,-сэр.-Сверимся-с-планами.mp3",
+    "file": "calendar_open__1.mp3",
+    "reply_id": "calendar_open",
+    "sha256": "b1c81a449a747635360b44ffca3b4f58b5b9ecd05b36097f11a2ec8b9d274868",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-25-Как-назовём-событие,-сэр.mp3",
+    "file": "library_9c50fda12fd4__1.mp3",
+    "reply_id": "library_9c50fda12fd4",
+    "sha256": "5e1e419aa2815b65dac20fe975d410ebc12c9bfcd8223831d2faf29a2b57dedc",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-25-Проверяю-ваши-дела-на-сегодня,-сэр.mp3",
+    "file": "schedule_today__1.mp3",
+    "reply_id": "schedule_today",
+    "sha256": "84a1be368fb72edc2c1c176feb33c34fb4062195eb6cbb16542e840d3a2ed483",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-26-На-какой-день-и-время-его-добавить.mp3",
+    "file": "library_4df5c65e1929__1.mp3",
+    "reply_id": "library_4df5c65e1929",
+    "sha256": "b575557110dda2576e5d4abc52ee3634aa37592717557de3bfc21545dc735ef8",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-26-Напоминание-готово,-сэр.mp3",
+    "file": "library_7415e4eac3cb__1.mp3",
+    "reply_id": "library_7415e4eac3cb",
+    "sha256": "44d2449dc5b2ccc85bded31e89446e3bd34aa7f70f1fa5236d1fd4a6d0ba9d55",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-26-О-чём-и-когда-напомнить,-сэр.mp3",
+    "file": "library_f6e44d6c9883__1.mp3",
+    "reply_id": "library_f6e44d6c9883",
+    "sha256": "d3d52ffc751e3ec99add217cdae43c272d62a1f9035e1d6fff7590dbebea297b",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-26-Событие-сохранено,-сэр.mp3",
+    "file": "library_1b990c01a964__1.mp3",
+    "reply_id": "library_1b990c01a964",
+    "sha256": "68fd3109d4af428e8f8b614691c32f41ee4356f0e3fcaeb183685dc8d76ee7ec",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-27-Сэр,-пришло-время-вашего-напоминания.-Подробност.mp3",
+    "file": "library_4ffe396213f2__1.mp3",
+    "reply_id": "library_4ffe396213f2",
+    "sha256": "0cbd1a159c969ced2ca1d0e4f1c860dc615f8b2ebb67637c6b54bbb35c614854",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-28-Открываю-заметки,-сэр.-Хорошие-мысли-лучше-сохра (1).mp3",
+    "file": "notes_open__1.mp3",
+    "reply_id": "notes_open",
+    "sha256": "d50a2ad418f6b57dde548dfd818e92fbfc94aadd0acf9a80678499c7d728a09c",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-28-Открываю-заметки,-сэр.-Хорошие-мысли-лучше-сохра.mp3",
+    "file": "notes_open__2.mp3",
+    "reply_id": "notes_open",
+    "sha256": "d50a2ad418f6b57dde548dfd818e92fbfc94aadd0acf9a80678499c7d728a09c",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-29-Как-назовём-новую-заметку,-сэр.mp3",
+    "file": "note_create__1.mp3",
+    "reply_id": "note_create",
+    "sha256": "0146d4ffbbae99935370940427af1de95b4c8f540f063a9824c64b3cd5cf4f0d",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-29-Какую-заметку-открыть,-сэр.mp3",
+    "file": "library_4e0831574f6a__1.mp3",
+    "reply_id": "library_4e0831574f6a",
+    "sha256": "9d5b8dfb084fa9872793317a4271b99f7f2e698d838a6bcd06d815b444de4f5f",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-29-Теперь-продиктуйте-текст,-сэр.mp3",
+    "file": "note_ask_content__1.mp3",
+    "reply_id": "note_ask_content",
+    "sha256": "4cf78af5cc31ed7961f3a646a33a9fcf952c2c3dd958327141340589b9766418",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-29-Что-добавить-к-выбранной-заметке.mp3",
+    "file": "note_ask_append_text__1.mp3",
+    "reply_id": "note_ask_append_text",
+    "sha256": "0ac0c5139e7dba59a8f6d34d78705c71d128186c482325ccad49b479faf86cef",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-30-Создадим-чек-лист,-сэр.-Назовите-его.mp3",
+    "file": "checklist_create__1.mp3",
+    "reply_id": "checklist_create",
+    "sha256": "c3761080eb5a00e6595a01ff100fff75d51010b32a6e241206d2c115ec73e29c",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-30-Сохранено,-сэр.-Мысль-не-потеряется.mp3",
+    "file": "note_saved__1.mp3",
+    "reply_id": "note_saved",
+    "sha256": "8c124e7781925548d1a9320046cf6043a2f87f174f1ee6f9e1685e445092ec5a",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-31-Продиктуйте-пункты,-сэр.-Между-ними-можно-делать.mp3",
+    "file": "checklist_ask_items__1.mp3",
+    "reply_id": "checklist_ask_items",
+    "sha256": "46af4bf81b23538fc3f475e09a6db9f70220b4edbfe100fb53d02bac906ec323",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-31-Пункт-отмечен,-сэр.-На-одно-дело-меньше.mp3",
+    "file": "library_7c5b8dfc3dc4__1.mp3",
+    "reply_id": "library_7c5b8dfc3dc4",
+    "sha256": "dedeb2370e7dfe387facf958a2f898257bc9ba178943064c7cdb3b28c5c161b5",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-31-Чек-лист-готов,-сэр.mp3",
+    "file": "checklist_saved__1.mp3",
+    "reply_id": "checklist_saved",
+    "sha256": "9a1b78b616bd4e7119961d77a243988a048f7fb339ae01ca32eba1e48811d019",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-32-Микрофон-готов,-сэр.mp3",
+    "file": "library_8e1bc171af4d__1.mp3",
+    "reply_id": "library_8e1bc171af4d",
+    "sha256": "063e0bbb100556ed0d508f8cc83eca84fd2ffd9a7eb2a895bcdd8ca1f97ebc74",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-32-Начинаю-запись,-сэр.-Говорите-в-удобном-темпе.mp3",
+    "file": "dictation_open__1.mp3",
+    "reply_id": "dictation_open",
+    "sha256": "6742b307d79cc847e88b34bab053600cd02b993bbd07eaba5047163516cb2130",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-33-Запись-завершена,-сэр.-Обрабатываю-речь.mp3",
+    "file": "dictation_stop__1.mp3",
+    "reply_id": "dictation_stop",
+    "sha256": "9f375122a20789b14738563d997962edc7266894e6ccfaf07f2bca6f3296e703",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-33-Текст-готов,-сэр.-Его-можно-проверить-и-отредакт.mp3",
+    "file": "library_fc7546f7baaf__1.mp3",
+    "reply_id": "library_fc7546f7baaf",
+    "sha256": "8bb13b1c889ed7dd9a7926928f66631e19f69afbeed99285cb1576ac4c1df9d1",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-36-Добавляю-пунктуацию,-сэр.mp3",
+    "file": "dictation_format__1.mp3",
+    "reply_id": "dictation_format",
+    "sha256": "24b7dd40e45c93c9900ee590adfc99a9e18c3bf127b0a722eb3f2c0103114688",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-37-В-записи-не-удалось-разобрать-речь,-сэр.-Проверь.mp3",
+    "file": "library_9fc056a89163__1.mp3",
+    "reply_id": "library_9fc056a89163",
+    "sha256": "d2bf61e4976bcb46973957237955dd5c4d0814c14879a957611b081be4058cbc",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-37-Форматирование-включено,-сэр.mp3",
+    "file": "library_81007e4d7df1__1.mp3",
+    "reply_id": "library_81007e4d7df1",
+    "sha256": "857c67bc56992194f6a24a6c8cb360367976a63bf816d4fc83e3a60a20d32f79",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-37-Форматирование-выключено.-Оставлю-распознанный-т.mp3",
+    "file": "library_07ced703ceb2__1.mp3",
+    "reply_id": "library_07ced703ceb2",
+    "sha256": "2a9a2c90db97119a771bb9ead69c9a7e6c382a01ad4aad3c52bb7898220978f2",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-38-На-какое-время-запустить-таймер,-сэр.mp3",
+    "file": "timer_ask_duration__1.mp3",
+    "reply_id": "timer_ask_duration",
+    "sha256": "8f3b449b9ec40ffe0092b31454a0dadbe65d67de0ae4c280656042d19203ba8a",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-39-Какой-пресет-выбрать,-сэр.mp3",
+    "file": "timer_ask_preset__1.mp3",
+    "reply_id": "timer_ask_preset",
+    "sha256": "bf01e8f158754cd68f32ff42d1558c5a33b743ae392e566218674a9836751a63",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-39-Отсчёт-начался,-сэр.-Можно-сосредоточиться.mp3",
+    "file": "timer_start__1.mp3",
+    "reply_id": "timer_start",
+    "sha256": "99243827af84a298cc0621d36a76e2a714e6e87d20f0c1e9a886c86e6600c8cf",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-39-Таймер-запущен,-сэр.-Я-сообщу-о-завершении.mp3",
+    "file": "timer_start__2.mp3",
+    "reply_id": "timer_start",
+    "sha256": "840d5b6995315f562ab1c393272cfe0837ac35afda97ac66a88ef494d6c90bb7",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-39-Таймер-на-паузе,-сэр.mp3",
+    "file": "timer_pause__1.mp3",
+    "reply_id": "timer_pause",
+    "sha256": "dd15d5340c86ecb223ba5a584a0ab494ea154ed783459e00926fb296a209dab9",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-40-Продолжаю-отсчёт,-сэр.mp3",
+    "file": "timer_resume__1.mp3",
+    "reply_id": "timer_resume",
+    "sha256": "a19149d0e6cbb76748f884d07ad6c28e1926d4540c370dabcf43713b62069335",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-40-Сэр,-осталось-пять-минут.mp3",
+    "file": "timer_five_minutes__1.mp3",
+    "reply_id": "timer_five_minutes",
+    "sha256": "ba4e1c7095130597decb2eac707bd857ccded112e5deeae64ed0c71005a5b5a3",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-40-Таймер-сброшен,-сэр.mp3",
+    "file": "timer_reset__1.mp3",
+    "reply_id": "timer_reset",
+    "sha256": "962ff45a8c9d05c440eaff064378b80fd12e2081dd73008ec6386657b2e28aa1",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-41-Время-вышло,-сэр.mp3",
+    "file": "timer_finished__1.mp3",
+    "reply_id": "timer_finished",
+    "sha256": "ec34dbd6841b2ceb6628dfe9a1569d842ddf4aad9d4a6b0783872bddd7af5801",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-41-Сэр,-осталась-одна-минута.mp3",
+    "file": "timer_one_minute__1.mp3",
+    "reply_id": "timer_one_minute",
+    "sha256": "cf2101b8e4a7215f45eefdb73adfcd48c7a31e38c2a781dda6ab3405d2202791",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-41-Таймер-завершён,-сэр.-Можно-сделать-небольшую-па.mp3",
+    "file": "timer_finished__2.mp3",
+    "reply_id": "timer_finished",
+    "sha256": "b1d22eb82eab1cdf0c31121c6d7a3be5aa094ed6a9c0a4be05027fe3e832eb97",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-42-Какую-привычку-отметить,-сэр.mp3",
+    "file": "habit_ask_number__1.mp3",
+    "reply_id": "habit_ask_number",
+    "sha256": "75f4ab08811c6f2846cdb1e202272cb5b0fe5b7e6007e5a2e546ad32c4993bf3",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-42-Открываю-привычки,-сэр.-Посмотрим-на-сегодняшний.mp3",
+    "file": "habits_open__1.mp3",
+    "reply_id": "habits_open",
+    "sha256": "8815010b5f4062f75c0a4b68b20cd66aa3d4d966e5445b3d57c60afb9ca572eb",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-42-Привычка-отмечена,-сэр.mp3",
+    "file": "habit_marked__1.mp3",
+    "reply_id": "habit_marked",
+    "sha256": "ea954946c26ce1e80d0841ec9c90015f8bee4115c6204e1a32451d9394f34339",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-43-Добавил-одну-отметку,-сэр.mp3",
+    "file": "habit_progress_added__1.mp3",
+    "reply_id": "habit_progress_added",
+    "sha256": "de61d45b5b0e154e7a29a6b4ab1dfe25b70e3648abaf144d3f6f5990f42e49ef",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-43-Прогресс-сохранён,-сэр.-Последовательность-важне.mp3",
+    "file": "library_5335ff79821e__1.mp3",
+    "reply_id": "library_5335ff79821e",
+    "sha256": "b1358a1e924429c458e456992f23097c308ba66755ddceb07a6aa014bf947984",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-43-Сегодняшняя-цель-уже-выполнена,-сэр.mp3",
+    "file": "habit_target_reached__1.mp3",
+    "reply_id": "habit_target_reached",
+    "sha256": "4d1872cf8a50659449483042be67f679096a6d5369181158917e195d9ed01005",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-43-Хорошая-работа,-сэр.-Ещё-один-небольшой-шаг.mp3",
+    "file": "library_e8580453a3a5__1.mp3",
+    "reply_id": "library_e8580453a3a5",
+    "sha256": "bbfb22c836693e30915d33e5a4dc56377faae1578676177f28d30eab40db5fc1",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-44-Как-назовём-новую-привычку,-сэр.mp3",
+    "file": "library_b09fb793ba73__1.mp3",
+    "reply_id": "library_b09fb793ba73",
+    "sha256": "958a458421ca0600156e437ffafbbf6d79198bbd25599130ef68c1d8f79bd6c5",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-44-Какую-нагрузку-предпочитаете-сегодня,-сэр.mp3",
+    "file": "library_68fd8b72d4dd__1.mp3",
+    "reply_id": "library_68fd8b72d4dd",
+    "sha256": "e93c4b87983b182fd7875f919a86cf4bdc6d70882d651660c6fb90173627adb3",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-44-Открываю-тренировочный-центр,-сэр.mp3",
+    "file": "training_open__1.mp3",
+    "reply_id": "training_open",
+    "sha256": "282d6ab8d4592e3601e9792825936672e8b2bfd2926cd96cacf7b0f5a6dcc5ee",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-44-Подбираю-тренировку,-сэр.-Учту-доступные-парамет.mp3",
+    "file": "training_generate__1.mp3",
+    "reply_id": "training_generate",
+    "sha256": "51a517e6f7352b3c57cb9a817e47e3f1252c705ae0aa014eb7bf9c9b25879444",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-45-Как-вы-себя-чувствуете,-сэр.mp3",
+    "file": "library_e33de71d0a73__1.mp3",
+    "reply_id": "library_e33de71d0a73",
+    "sha256": "b3aa2a22dab185cf9adaad6cead34fdbc9aac1e8485ebb63bcc3d094a3fe4306",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-45-Открываю-зарядку,-сэр.-Начните-в-комфортном-темп.mp3",
+    "file": "charge_open__1.mp3",
+    "reply_id": "charge_open",
+    "sha256": "3ea7bbda07c46451d88f62edc7f2935fa39abec51e8bda0ecc3e41effe92c56f",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-45-Сегодня-можно-выбрать-спокойный-вариант,-сэр.mp3",
+    "file": "library_0e1d8e36e832__1.mp3",
+    "reply_id": "library_0e1d8e36e832",
+    "sha256": "ddc5e4aad0dd6a63eb3de6cd145c12aa3b9446406181b3ca63b4d57c9ad3b0fe",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-46-Подход-записан,-сэр.mp3",
+    "file": "library_b11ddcb10adb__1.mp3",
+    "reply_id": "library_b11ddcb10adb",
+    "sha256": "dca7e8a6bc4b5780d750471aad48715a2b867bd798828981e617253e4ea46ae4",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-46-Сделайте-паузу,-сэр.-Восстановление-тоже-часть-т.mp3",
+    "file": "library_ed66c9a4d1e1__1.mp3",
+    "reply_id": "library_ed66c9a4d1e1",
+    "sha256": "3e259e5749e0900b317f8339c4754e7fb95a250d61acc926883f7557160e33f2",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-46-Тренировка-сохранена,-сэр.mp3",
+    "file": "library_0542b5adfce1__1.mp3",
+    "reply_id": "library_0542b5adfce1",
+    "sha256": "bb827803a862ce541055fe7e73e3aaa0fd4fce741011be5c7214615be8bc841d",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-46-Хорошая-работа,-сэр.-Не-забудьте-отдохнуть.mp3",
+    "file": "library_04ff214dfbd4__1.mp3",
+    "reply_id": "library_04ff214dfbd4",
+    "sha256": "564dc21cd675f54e2fdbaec8c484376214ee41424820bed863bf7a261884c90a",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-47-Измерение-сохранено,-сэр.mp3",
+    "file": "weight_saved__1.mp3",
+    "reply_id": "weight_saved",
+    "sha256": "cb3a531c298b1657a9cad19054997fb9c130a6a88cb9615f963f14a7735c9611",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-47-Назовите-новое-значение-веса,-сэр.mp3",
+    "file": "weight_add__1.mp3",
+    "reply_id": "weight_add",
+    "sha256": "82e6220f82171ff491d90f45a533af967768c3271e89111590291d83143acf7f",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-47-Открываю-ваши-параметры,-сэр.mp3",
+    "file": "profile_open__1.mp3",
+    "reply_id": "profile_open",
+    "sha256": "fdd5c642fec54a0d62321bad3b10b004054f61c4eaaca3879be9c95322a6418f",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-47-Показываю-статистику,-сэр.-Посмотрим-на-изменени.mp3",
+    "file": "stats_open__1.mp3",
+    "reply_id": "stats_open",
+    "sha256": "0f1208902f4bc94ac1cac262537418c4b81695a0d807080bcdf91a63bfc58a11",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-48-Для-какого-города-показать-прогноз.mp3",
+    "file": "weather_city__1.mp3",
+    "reply_id": "weather_city",
+    "sha256": "874747d60f18f4b78ab5369b14bda2e4b5c0b2dec2c0c25e8df97b7e6db66a63",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-48-Проверяю-погоду,-сэр.mp3",
+    "file": "weather__1.mp3",
+    "reply_id": "weather",
+    "sha256": "0a68ccb862ee4b09ccf809bcdf5b20350fa2a5e2d65cab1438f17772b326197e",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-52-Город-изменён,-сэр.-Обновляю-данные.mp3",
+    "file": "weather_city_saved__1.mp3",
+    "reply_id": "weather_city_saved",
+    "sha256": "c02ea765f88fac35c16e9d3b46f5f1cdbf31b2cb51d57a0441602c7b967c9f7d",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-52-На-какой-период-показать-погоду,-сэр.mp3",
+    "file": "weather_ask_period__1.mp3",
+    "reply_id": "weather_ask_period",
+    "sha256": "d5af330c02da374d5b23b34838648026c2a9ccc494d1b469da7a0f1a961a23f4",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-52-Показываю-сезонную-оценку,-сэр.-Это-ориентир,-а.mp3",
+    "file": "library_4c2ef51a3556__1.mp3",
+    "reply_id": "library_4c2ef51a3556",
+    "sha256": "0cd17288b697266ae0bada941b94743867db4cf913a4da7daa61e0965706dfc4",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-52-Прогноз-готов,-сэр.-Подробности-на-экране.mp3",
+    "file": "library_f5e48eafa543__1.mp3",
+    "reply_id": "library_f5e48eafa543",
+    "sha256": "5a344dd6bace1535bdcb57fd319b03b2651b891aaf264fad36c48c1f8738532e",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-53-Открываю-хранилище,-сэр.-Введите-мастер-пароль-н.mp3",
+    "file": "vault_open__1.mp3",
+    "reply_id": "vault_open",
+    "sha256": "d79a05f28b0f2f8b8b568dd2f38fb37453ce32f01fc2541b7d42e7561112e791",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-53-Сейчас-погодный-сервис-недоступен,-сэр.-Попробуй.mp3",
+    "file": "weather_unavailable__1.mp3",
+    "reply_id": "weather_unavailable",
+    "sha256": "f84bd4b30055a6b56530b1b6a58ad6683f28e9a102d1b259ce85a99b315e15af",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-53-Хранилище-заблокировано,-сэр.mp3",
+    "file": "vault_lock__1.mp3",
+    "reply_id": "vault_lock",
+    "sha256": "35d7743d7f7a8883ef2eece32be7b0bcfdc91b94460692d0c8f1255a32f59ea1",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-54-Запись-сохранена,-сэр.mp3",
+    "file": "library_62e449d14cf7__1.mp3",
+    "reply_id": "library_62e449d14cf7",
+    "sha256": "420f34bb9bd3353586abbda8f9d02acde07aa2314d59cc565302068c5a6ecac7",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-54-Открываю-статистику-обращений,-сэр.mp3",
+    "file": "library_5483fec7fb1e__1.mp3",
+    "reply_id": "library_5483fec7fb1e",
+    "sha256": "b52561932bb84a9b433341f4cf13f5ce2aaaf6e0b781a63a30f5c8fe3d6da41c",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-54-Показываю-историю-запросов,-сэр.mp3",
+    "file": "library_167ada1b8f5a__1.mp3",
+    "reply_id": "library_167ada1b8f5a",
+    "sha256": "0fe4bf5e1e30832cadadff46926aaec76e0fc2a67872a2d72ccd34b599c9b911",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-55-Какую-категорию-показать,-сэр.mp3",
+    "file": "library_506bcbb02672__1.mp3",
+    "reply_id": "library_506bcbb02672",
+    "sha256": "9fdfdaf14febd118553811dbf200af174fd2e6432b8b3407f104732fd5ee334e",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-55-Открываю-журнал-событий,-сэр.mp3",
+    "file": "logs_open__1.mp3",
+    "reply_id": "logs_open",
+    "sha256": "93a204766b09188a134aa226fec4032eb27b4e29ee1f462de74f83a3412f3749",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-55-Скрываю-журнал,-сэр.-Работа-продолжается.mp3",
+    "file": "library_6d51d345cdd8__1.mp3",
+    "reply_id": "library_6d51d345cdd8",
+    "sha256": "5b0619167a486223065052fd67ce234ea58ce22a4268ac9bcd1eb34dc5ebf9ab",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-56-Включаю-разговорный-режим,-сэр.mp3",
+    "file": "dialogue_start__1.mp3",
+    "reply_id": "dialogue_start",
+    "sha256": "e7f0402c0bc7d906241e2ecc326ac356c397bab54eda34408c1a95c563a18cc3",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-56-Проверю-это-в-интернете,-сэр.mp3",
+    "file": "library_3254fb19cc06__1.mp3",
+    "reply_id": "library_3254fb19cc06",
+    "sha256": "e5c0f39e158960fdaf22868d63a84f9b2fcecb4ea0dbed7ecace8e94dba08123",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-56-Сейчас-разберёмся,-сэр.mp3",
+    "file": "library_d1d3896a7249__1.mp3",
+    "reply_id": "library_d1d3896a7249",
+    "sha256": "f3c2394cd625820d6521d6cf2861fb566491f3c82a181423fa3dfa01e3249da1",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-56-Я-слушаю,-сэр.-О-чём-поговорим.mp3",
+    "file": "dialogue_start__2.mp3",
+    "reply_id": "dialogue_start",
+    "sha256": "e6b5cdd6afb5c399c2aeea22605c9eb449aa8e4077f506d24695b27785ac41bd",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-57-Ищу-актуальную-информацию,-сэр.mp3",
+    "file": "library_439ba7b9b99f__1.mp3",
+    "reply_id": "library_439ba7b9b99f",
+    "sha256": "d20f55788236abc75ac7231eccb1a22a6d8d11e46ba8c0a61d880644b7ad7b6d",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-57-Нашёл-результаты,-сэр.-Сейчас-выделю-главное.mp3",
+    "file": "library_8be659411cbc__1.mp3",
+    "reply_id": "library_8be659411cbc",
+    "sha256": "6996c2aab5231d4edc6c10e724d01fac14b8580b98bb0b1b2025bf520d610e59",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-57-Не-удалось-получить-ответ,-сэр.-Попробуйте-ещё-р.mp3",
+    "file": "library_b4871e48eb9a__1.mp3",
+    "reply_id": "library_b4871e48eb9a",
+    "sha256": "9fa36e6ee748c9b3cd2691514454f1bd2d99cf92e572130957333c2c1b4144b5",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-58-Готово,-сэр.-Маленькая-победа-над-списком-дел.mp3",
+    "file": "library_233cec971593__1.mp3",
+    "reply_id": "library_233cec971593",
+    "sha256": "db8ac2f4ed6fea976cab984bd367a27afd46c2daf7585fee40bc2dfd0ae94084",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-58-Завершаю-разговорный-режим,-сэр.mp3",
+    "file": "dialogue_stop__1.mp3",
+    "reply_id": "dialogue_stop",
+    "sha256": "4cb413c6ba62b44ad9a263fd6db4fc06c08002c7701af44ca73c652bebea9298",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-58-К-вашим-услугам,-сэр.-Кофе-пока-придётся-пригото.mp3",
+    "file": "library_0ad97b90c8d3__1.mp3",
+    "reply_id": "library_0ad97b90c8d3",
+    "sha256": "fe73e4e7babcae156a07832f303594994f3aa45297caca599579f2b6e055b53a",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-58-Хорошо,-сэр.-Вернёмся-к-этому-позже.mp3",
+    "file": "library_5d68b674a4c7__1.mp3",
+    "reply_id": "library_5d68b674a4c7",
+    "sha256": "d19c8adea83edb61884686ee90659d353789c4b20b12904e1f00062fd23e84b5",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-59-Мысль-записана,-сэр.-Память-снова-может-немного.mp3",
+    "file": "note_saved_ironic__1.mp3",
+    "reply_id": "note_saved_ironic",
+    "sha256": "70aace45e8a7460ffe9056fccc6742a0ad85c8bab5dbd417321a67c0868e847f",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-59-Открываю-новости,-сэр.-Постараемся-сохранить-душ.mp3",
+    "file": "news_open_ironic__1.mp3",
+    "reply_id": "news_open_ironic",
+    "sha256": "e7996f61e9f14a71c2b03b2345c076881d992b03c148c3e98d3c7d8cb497cde6",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-20-59-Планы-сохранены,-сэр.-Теперь-осталось-договорить.mp3",
+    "file": "library_f5e48188c7ed__1.mp3",
+    "reply_id": "library_f5e48188c7ed",
+    "sha256": "c2204e2de7ebd568204f68545e14b98a8b5d9dba5beca33a8809c1d4b5cca072",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-00-Открываю-зарядку,-сэр.-Героизм-оставим-на-потом.mp3",
+    "file": "charge_open_ironic__1.mp3",
+    "reply_id": "charge_open_ironic",
+    "sha256": "b224a5374221eae8fd8fddd653661491381d7b810a40760c938171995834b5fb",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-00-Привычка-отмечена,-сэр.-Будущий-вы-будет-благода.mp3",
+    "file": "habit_marked_ironic__1.mp3",
+    "reply_id": "habit_marked_ironic",
+    "sha256": "2b759a351887d716a77e982b3769a5a94b409b8c288c8101c967d181f12b63b4",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-00-Таймер-запущен,-сэр.-Со-временем-мы-хотя-бы-дого.mp3",
+    "file": "timer_start_ironic__1.mp3",
+    "reply_id": "timer_start_ironic",
+    "sha256": "1796bce73f00a0d0390b34ee8bc0e0e58336824a34423db30f04201e9de00a82",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-00-Чек-лист-готов,-сэр.-Теперь-у-хаоса-есть-конкуре.mp3",
+    "file": "checklist_saved_ironic__1.mp3",
+    "reply_id": "checklist_saved_ironic",
+    "sha256": "f952b922316c2e904f5100c3884e0720a031a28b36a71d6e113a4ce533b08307",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-05-Всё-готово,-сэр.-На-этот-раз-без-драматических-с.mp3",
+    "file": "library_c9fa78e2d9c9__1.mp3",
+    "reply_id": "library_c9fa78e2d9c9",
+    "sha256": "66bb8179eb8437a7b277a56e8346304d07053d25d51145a0dca156b414a8571a",
+    "connected": false
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-05-Мой-план-на-день-прост-помогать-вам-и-не-станови.mp3",
+    "file": "jarvis_joke_101.mp3",
+    "reply_id": "jarvis_joke",
+    "sha256": "11828025582b07a461153b73f05423375b5476eaf81de1de74ae6b4864ac4159",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-06-Искусственный-интеллект-не-устаёт.-Зато-прекрасн.mp3",
+    "file": "jarvis_joke_102.mp3",
+    "reply_id": "jarvis_joke",
+    "sha256": "a36ca2e7405b6f9c61fb25d69bee2bcadd5b6d338a532159ce7546cc25417043",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-06-Самое-сложное-в-списке-дел-—-убедить-его-стать-с.mp3",
+    "file": "jarvis_joke_103.mp3",
+    "reply_id": "jarvis_joke",
+    "sha256": "b4fb1d08cf42a802db2e7f69009ca5a829eff1bea406536b81d644c9b5e17f6e",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-06-Я-бы-рассказал-шутку-про-таймер,-но-боюсь-не-уло.mp3",
+    "file": "jarvis_joke_104.mp3",
+    "reply_id": "jarvis_joke",
+    "sha256": "ef84405b8e18f93cac4f3ef190c1f0ff2e6c41996f7a56d4389db98d49616b70",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-07-Если-мысль-не-записана,-она-автоматически-перехо.mp3",
+    "file": "jarvis_joke_105.mp3",
+    "reply_id": "jarvis_joke",
+    "sha256": "f4ad49dac0d7279f7872fd3be3974b58b4eaefd69fa8b3847c83cfc8e931afd2",
+    "connected": true
+  },
+  {
+    "source": "ДЖАРВИС-2026-10-04-21-07-У-меня-нет-плохих-привычек.-Только-несколько-нас.mp3",
+    "file": "jarvis_joke_106.mp3",
+    "reply_id": "jarvis_joke",
+    "sha256": "47c129e87fbfbbcfd3faf6a68aedd83a1bcc3b63203bc9c79cf98b1c010a4207",
+    "connected": true
+  }
+]

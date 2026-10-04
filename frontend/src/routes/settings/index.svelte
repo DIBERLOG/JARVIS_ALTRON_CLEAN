@@ -226,7 +226,7 @@
             selectedVad = vad
             gainNormalizerEnabled = gainNormalizer === "true"
             voiceDialoguePersonality = dialoguePersonality === "altron" ? "altron" : "jarvis"
-            ttsMode = savedTtsMode === "xtts" ? "xtts" : "silero"
+            ttsMode = ["s2", "xtts", "silero"].includes(savedTtsMode) ? savedTtsMode : "xtts"
             monitorSelf = savedMonitorSelf === "true"
             audioOutputMode = await invoke<string>("db_read", { key: "audio_output_mode" }) === "voicemod" ? "voicemod" : "direct"
             apiKeyPicovoice = pico
@@ -306,8 +306,11 @@
             <h3 id="tts-mode-title">Как будет говорить ассистент</h3>
             <p>Выбор для чата, диалога и других ответов, созданных на лету. Готовые звуки команд не меняются.</p>
             <div class="tts-mode-options">
+                <button type="button" class:active={ttsMode === "s2"} on:click={() => ttsMode = "s2"} aria-pressed={ttsMode === "s2"}>
+                    <strong>Fish Audio S2 Pro</strong><span>Выбранный реалистичный голос. Постоянный локальный сервер и кэш ускоряют повторные ответы.</span>
+                </button>
                 <button type="button" class:active={ttsMode === "xtts"} on:click={() => ttsMode = "xtts"} aria-pressed={ttsMode === "xtts"}>
-                    <strong>Обученный голос XTTS</strong><span>Выбранный тобой пробный голос. Для работы нужна локально сохранённая модель.</span>
+                    <strong>Обученный голос XTTS</strong><span>Предыдущий сохранённый голос. Можно вернуться к нему без повторного обучения.</span>
                 </button>
                 <button type="button" class:active={ttsMode === "silero"} on:click={() => ttsMode = "silero"} aria-pressed={ttsMode === "silero"}>
                     <strong>Silero</strong><span>Локальная озвучка. Работает напрямую или через Voicemod — выбери вывод ниже.</span>
