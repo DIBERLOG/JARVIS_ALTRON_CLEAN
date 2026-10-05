@@ -609,10 +609,7 @@
         animation: bg-pulse 3s ease-in-out infinite;
     }
 
-    // Waiting/disconnected states retain their fade/scale transitions, not rotation.
-    .reactor-container:not(.active) {
-        .semi_arc_3, .coil-container { animation-play-state: paused; }
-    }
+    // Keep ambient rotation in every state; state-specific speed, scale and glow remain intact.
 
     @keyframes bg-pulse {
         0%, 100% { 

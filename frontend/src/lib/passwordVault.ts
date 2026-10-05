@@ -13,7 +13,15 @@ async function passwordKey(password:string,salt:string){
 async function seal(key:CryptoKey,bytes:Uint8Array):Promise<Sealed>{const iv=random(12);return {iv:b64(iv),data:b64(new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv:iv as BufferSource},key,bytes as BufferSource)))}}
 async function open(key:CryptoKey,sealed:Sealed){return new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:un64(sealed.iv) as BufferSource},key,un64(sealed.data) as BufferSource))}
 function requirePassword(password:string){if(password.length<6||password.length>1024)throw Error('Мастер-пароль должен содержать от 6 до 1024 символов. Лучше используйте длинную уникальную фразу.')}
-function readVault(value:string):VaultFile{const file=JSON.parse(value);if(file.version!==1||typeof file.salt!=='string'||!file.passwordKey||!file.recoveryKey||!file.cards)throw Error('Формат хранилища повреждён или не поддерживается');return file}
+export function readVault(value:string):VaultFile{
+    if(value.length>36_000_000)throw Error('Файл хранилища больше 36 МБ')
+    const file=JSON.parse(value),bad=()=>{throw Error('Формат хранилища повреждён или не поддерживается')}
+    const bytes=(v:unknown)=>{if(typeof v!=='string'||!/^[A-Za-z0-9+/]+={0,2}$/.test(v))return -1;try{return un64(v).length}catch{return -1}}
+    if(!file||file.version!==1||bytes(file.salt)!==16)bad()
+    for(const name of ['passwordKey','recoveryKey','cards'])if(!file[name]||bytes(file[name].iv)!==12||bytes(file[name].data)<16)bad()
+    if(bytes(file.passwordKey.data)!==48||bytes(file.recoveryKey.data)!==48)bad()
+    return {version:1,salt:file.salt,passwordKey:{iv:file.passwordKey.iv,data:file.passwordKey.data},recoveryKey:{iv:file.recoveryKey.iv,data:file.recoveryKey.data},cards:{iv:file.cards.iv,data:file.cards.data}}
+}
 export async function createVault(password:string){
     requirePassword(password)
     const raw=random(32),recovery=random(32),salt=b64(random(16)),key=await importKey(raw)

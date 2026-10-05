@@ -84,8 +84,8 @@ settings-disabled = Вимкнено
 # settings - beta notice
 settings-beta-title = Попередній випуск!
 settings-beta-desc = Частина функцій може працювати некоректно.
-settings-beta-feedback = Повідомляйте про всі знайдені баги в
-settings-beta-bot = наш телеграм бот
+settings-beta-feedback = Повідомляйте про всі знайдені баги на пошту
+settings-beta-bot = workspace34t@gmail.com
 settings-open-logs = Відкрити папку з логами
 
 # settings - picovoice

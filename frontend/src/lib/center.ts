@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core"
 import type { TrainingData } from "./training"
 
-export type Reminder = { id: string, title: string, dueAt: string, done: boolean }
+export type Reminder = { id: string, title: string, dueAt: string, done: boolean, advanceDays?: number[], announced?: string[], createdAt?: string, silentPast?:boolean }
 export type Birthday = { id: string, name: string, month: number, day: number, year?: number }
 export type ChecklistItem = { id: string, text: string, done: boolean }
 export type Note = { id: string, title: string, text: string, updatedAt: string, type?: "text" | "checklist", format?: "plain" | "markdown" | "rich", html?: string, items?: ChecklistItem[] }
@@ -48,10 +48,15 @@ export function birthdayDate(birthday: Birthday, year: number): Date {
 }
 
 export function nextBirthday(birthday: Birthday, now = new Date()): Date {
-    let date = birthdayDate(birthday, now.getFullYear())
+    const year = Math.max(now.getFullYear(), birthday.year ?? now.getFullYear())
+    let date = birthdayDate(birthday, year)
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    if (date < today) date = birthdayDate(birthday, now.getFullYear() + 1)
+    if (date < today) date = birthdayDate(birthday, year + 1)
     return date
+}
+
+export function birthdayOccursInYear(birthday: Birthday, year: number): boolean {
+    return birthday.year === undefined || year >= birthday.year
 }
 
 export function makeId(): string {

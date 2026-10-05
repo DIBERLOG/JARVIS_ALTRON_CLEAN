@@ -154,18 +154,24 @@ pub fn execute_cli(exe: &str, args: &[String]) -> std::io::Result<Child> {
     process::launch(Path::new(exe), args)
 }
 
+fn command_cli_arguments(pack: &Path, arguments: &[String]) -> Vec<String> {
+    arguments.iter().map(|argument| argument.replace("{command_dir}", &pack.to_string_lossy())).collect()
+}
+
 pub fn execute_command(
     cmd_path: &PathBuf,
     command: &JCommand,
     phrase: Option<&str>,
     slots: Option<&HashMap<String, SlotValue>>,
 ) -> Result<bool, String> {
+    // Explicit resource placeholder, not shell expansion: commands remain portable across installs.
+    let cli_arguments = command_cli_arguments(cmd_path, &command.cli_args);
     let definition = Definition {
         kind: &command.cmd_type,
         executable: &command.exe_path,
         executable_arguments: &command.exe_args,
         cli: &command.cli_cmd,
-        cli_arguments: &command.cli_args,
+        cli_arguments: &cli_arguments,
         script: &command.script,
     };
     let plan = dispatch::plan(cmd_path, &definition)?;
@@ -357,5 +363,16 @@ mod phrase_tests {
             assert_eq!(arguments, command.cli_args);
         }
         // Only constructing plans: this test never minimizes real windows.
+    }
+    #[test]
+    fn windows_restore_aliases_and_resource_path() {
+        let pack: JCommandsList = toml::from_str(include_str!("../../../resources/commands/windows/command.toml")).unwrap();
+        let packs=vec![pack];
+        for phrase in ["верни все окна", "разверни все окна", "восстанови все окна", "разверни окна обратно"] {
+            let CommandSelection::Found(_, command)=resolve_in_language(phrase,&packs,"ru",false) else { panic!("Missing restore alias: {phrase}") };
+            assert_eq!(command.id,"windows_restore_all");
+        }
+        let arguments=command_cli_arguments(Path::new("C:/Folder With Spaces/windows"), &["{command_dir}/windows.ps1".into(),"a & b".into()]);
+        assert_eq!(arguments,vec!["C:/Folder With Spaces/windows/windows.ps1","a & b"]);
     }
 }

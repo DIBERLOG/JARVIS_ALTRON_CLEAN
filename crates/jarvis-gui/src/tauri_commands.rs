@@ -47,3 +47,5 @@ mod weather;
 pub use weather::*;
 mod vault;
 pub use vault::*;
+mod outlook;
+pub use outlook::*;

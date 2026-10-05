@@ -85,7 +85,7 @@ settings-disabled = Disabled
 settings-beta-title = Pre-release version!
 settings-beta-desc = Some features may not work correctly.
 settings-beta-feedback = Report all bugs to
-settings-beta-bot = our Telegram bot
+settings-beta-bot = workspace34t@gmail.com
 settings-open-logs = Open logs folder
 
 # settings - picovoice

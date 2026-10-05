@@ -55,6 +55,8 @@ pub struct Settings {
     #[serde(default)]
     pub center_data: String,
     #[serde(default)]
+    pub center_reminder_announcements: String,
+    #[serde(default)]
     pub news_translation_cache: String,
 
     pub api_keys: ApiKeys,
@@ -102,6 +104,7 @@ impl Settings {
             "assistant_personality"      => Some(self.personality.clone()),
             "voice_dialogue_personality" => Some(self.voice_dialogue_personality.clone()),
             "center_data"             => Some(self.center_data.clone()),
+            "center_reminder_announcements" => Some(self.center_reminder_announcements.clone()),
             "news_translation_cache_v1" => Some(self.news_translation_cache.clone()),
             "api_key__picovoice"        => Some(self.api_keys.picovoice.clone()),
             "api_key__openai"           => Some(self.api_keys.openai.clone()),
@@ -182,6 +185,12 @@ impl Settings {
                 serde_json::from_str::<serde_json::Value>(val).map_err(|e| format!("invalid center data: {e}"))?;
                 self.center_data = val.to_string();
             }
+            "center_reminder_announcements" => {
+                if val.len()>4_000_000 { return Err("Слишком большой журнал напоминаний".into()); }
+                let ledger: std::collections::HashMap<String, Vec<String>> = serde_json::from_str(val).map_err(|_|"Некорректный журнал напоминаний")?;
+                if ledger.values().any(|keys| keys.len()>1000) { return Err("Слишком много отметок напоминания".into()); }
+                self.center_reminder_announcements = val.to_string();
+            }
             "news_translation_cache_v1" => {
                 if val.len()>4_000_000 {return Err("Кэш переводов слишком большой".into())}
                 let entries:serde_json::Value=serde_json::from_str(val).map_err(|_|"Некорректный кэш переводов")?;
@@ -226,6 +235,7 @@ impl Settings {
             "assistant_personality",
             "voice_dialogue_personality",
             "center_data",
+            "center_reminder_announcements",
             "api_key__picovoice",
             "api_key__openai",
             "api_key__deepseek",
@@ -267,6 +277,7 @@ impl Default for Settings {
             personality: default_personality(),
             voice_dialogue_personality: default_voice_dialogue_personality(),
             center_data: String::new(),
+            center_reminder_announcements: String::new(),
             news_translation_cache: String::new(),
 
             api_keys: ApiKeys {
@@ -337,8 +348,11 @@ mod center_data_tests {
     fn center_data_survives_settings_round_trip() {
         let mut settings = Settings::default();
         settings.set("center_data", r#"{"reminders":[{"id":"1","title":"Зал","dueAt":"2026-10-01T09:00","done":false}],"birthdays":[]}"#).unwrap();
+        settings.set("center_reminder_announcements", r#"{"1":["2026-10-01T09:00:0"]}"#).unwrap();
         let restored: Settings = serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
         assert!(restored.get("center_data").unwrap().contains("Зал"));
+        assert!(restored.get("center_reminder_announcements").unwrap().contains("2026-10-01"));
+        assert!(settings.set("center_reminder_announcements", "[]").is_err());
         assert!(settings.set("center_data", "not-json").is_err());
     }
 }

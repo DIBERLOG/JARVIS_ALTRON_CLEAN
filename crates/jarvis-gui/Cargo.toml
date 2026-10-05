@@ -26,7 +26,7 @@ serde.workspace = true
 serde_json.workspace = true
 platform-dirs.workspace = true
 parking_lot.workspace = true
-reqwest.workspace = true
+reqwest = { workspace = true, features = ["form"] }
 chrono.workspace = true
 quick-xml = "0.38"
 vosk = "0.3.1"

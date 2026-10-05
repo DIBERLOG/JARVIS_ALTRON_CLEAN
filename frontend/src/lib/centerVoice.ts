@@ -5,6 +5,8 @@ import { loadCenterData, saveCenterData, dayKey, makeId, type CenterData } from 
 import { timerPresets, customPresets, selectTimer, startTimer, pauseTimer, resetTimer } from './timer'
 import { defaultTraining } from './training'
 import { getWeekWeather, weatherPeriod } from './weather'
+import { handleMailVoice, resetMailVoice } from './outlook'
+import { parseReminderDate } from './reminders'
 
 export const centerSection = writable('calendar')
 export const trainingVoiceTab = writable('today')
@@ -22,7 +24,7 @@ async function waitForNewsAction() {
     }
     throw new Error('Личный центр сейчас недоступен. Откройте новостную ленту.')
 }
-type Pending = { kind: string; ids?: string[]; title?: string; id?: string }
+type Pending = { kind: string; ids?: string[]; title?: string; id?: string; editId?:string; advanceDays?:number[] }
 let pending: Pending | null = null
 const clean = (text: string) => text.toLowerCase().replace(/ё/g,'е').trim().replace(/[.!?,]+$/g,'').trim()
 export function spokenNumber(text: string): number | undefined {
@@ -42,7 +44,7 @@ function reply(text: string, id = '', followUp = false) {
     hintTimer=setTimeout(()=>centerVoiceHint.set(''),followUp?90000:6000)
     sendAction('center_reply', {text, reply_id:id, follow_up:followUp})
 }
-export function resetCenterVoice() { pending=null }
+export function resetCenterVoice() { pending=null; resetMailVoice() }
 export function centerVoiceError(error: unknown) {
     const message=typeof error==='string'?error:(error as Error)?.message||'Не удалось выполнить действие.'
     const id=/переводится/.test(message)?'news_translation_busy':/перевести|Ollama|перевод/.test(message)?'news_translation_error':/погод|прогноз/.test(message)?'weather_unavailable':/центр сейчас недоступен/i.test(message)?'voice_center_unavailable':'action_failed'
@@ -52,7 +54,8 @@ export function navigateCenter(section: string) { centerSection.set(section); wi
 async function save(data: CenterData) { await saveCenterData(data); centerRevision.update(value => value + 1) }
 export async function handleCenterVoice(raw: string) {
     const text = clean(raw)
-    if (/^(отмена|отмени|отменить|не надо|не нужно|нет|не сохраняй|передумал)$/.test(text)) {pending = null; reply('Действие отменено, сэр.','action_cancelled'); return}
+    if (/^(отмена|отмени|отменить|не надо|не нужно|нет|не сохраняй|передумал)$/.test(text)) {pending = null; resetMailVoice(); reply('Действие отменено, сэр.','action_cancelled'); return}
+    if (!pending && await handleMailVoice(raw, { navigate: navigateCenter, reply, number: spokenNumber })) return
     if (pending) {
         const step = pending
         if(step.kind==='duration'){
@@ -92,23 +95,30 @@ export async function handleCenterVoice(raw: string) {
             await getWeekWeather(raw,true);pending=null;reply(`Город изменён: ${raw}, сэр.`,'weather_city_saved');return
         }
         const data=await loadCenterData()
-        if(step.kind==='reminder-title'){pending={kind:'reminder-time',title:raw};reply('Назовите дату и время: например, 04.10 в 18:30.', 'reminder_ask_time', true);return}
+        if(step.kind==='reminder-select') {
+            const n=spokenNumber(text),item=n&&data.reminders.find(item=>item.id===step.ids?.[n-1])
+            if(!item){reply('Назовите номер напоминания из списка.','selection_invalid',true);return}
+            pending={kind:'reminder-title',editId:item.id};reply('Продиктуйте новый текст напоминания, сэр.','',true);return
+        }
+        if(step.kind==='reminder-title'){pending={kind:'reminder-time',title:raw,editId:step.editId};reply('Назовите дату и время: например, завтра в 18:30.', 'reminder_ask_time', true);return}
         if(step.kind==='reminder-time') {
-            if(text.includes('через')) {
-                const n=spokenNumber(text),seconds=n ? n*(text.includes('час')?3600:text.includes('секунд')?1:60) : 0
-                if(seconds>0&&seconds<=86400){const due=new Date(Date.now()+seconds*1000);pending={kind:'reminder-confirm',title:step.title,id:due.toISOString()};reply(`Напомнить ${step.title} через ${n} ${text.includes('час')?'часов':'минут'}? Скажите да или отмена.`,'reminder_ask_confirm',true);return}
-            }
-            const match=text.match(/(?:(\d{1,2})[.\/-](\d{1,2})(?:[.\/-](\d{4}))?|(?:сегодня|завтра))\s*(?:в\s*)?(\d{1,2})[:.](\d{2})/)
-            if(!match){reply('Укажите дату в формате 04.10 в 18:30, либо скажите через десять минут.','reminder_time_invalid',true);return}
-            const due=new Date();if(text.includes('завтра'))due.setDate(due.getDate()+1)
-            if(match[1])due.setFullYear(Number(match[3]||due.getFullYear()),Number(match[2])-1,Number(match[1]))
-            due.setHours(Number(match[4]),Number(match[5]),0,0)
-            if(due.getTime()<=Date.now()||Number(match[4])>23||Number(match[5])>59){reply('Нужно указать будущее время, сэр.','reminder_time_invalid',true);return}
-            pending={kind:'reminder-confirm',title:step.title,id:due.toISOString()};reply(`Создать напоминание ${step.title} на ${due.toLocaleString('ru-RU')}? Скажите да или отмена.`,'reminder_ask_confirm',true);return
+            const due=parseReminderDate(text,new Date(),true)
+            if(!due){reply('Укажите дату и время: завтра в 18:30, вчера в 09:00 или через десять минут.','',true);return}
+            pending={...step,kind:'reminder-advance',id:due.toISOString()}
+            reply('Предупредить заранее? Скажите: за день, за два дня, за день и два, либо без предупреждения.','',true);return
+        }
+        if(step.kind==='reminder-advance') {
+            const days=/без|не нужно|только в/.test(text)?[]:/день и два|один и два|два и один|два.*день|день.*два/.test(text)?[1,2]:/два|двое|2/.test(text)?[2]:/день|один|сутки|1/.test(text)?[1]:null
+            if(!days){reply('Скажите за день, за два дня или без предупреждения.','',true);return}
+            pending={...step,kind:'reminder-confirm',advanceDays:days}
+            reply(`${step.editId?'Изменить':'Создать'} напоминание: ${step.title}. ${new Date(step.id!).toLocaleString('ru-RU')}. ${days.length?'Предупреждения за '+days.join(' и ')+' дн.':'Без предварительного предупреждения.'} Скажите да или отмена.`,'',true);return
         }
         if(step.kind==='reminder-confirm') {
             if(!/^(да|давай|ага|угу|конечно|хорошо|ладно|окей|ок|согласен|верно|все верно|подтверждаю|подтверди|сохрани|сохранить|да сохрани|да подтверждаю)$/.test(text)){reply('Скажите да для сохранения либо отмена.','confirm_again',true);return}
-            data.reminders.push({id:makeId(),title:step.title!,dueAt:step.id!,done:false});await save(data);pending=null;reply('Напоминание сохранено, сэр.','reminder_saved');return
+            const reminder={id:step.editId||makeId(),title:step.title!,dueAt:step.id!,done:false,advanceDays:step.advanceDays||[],announced:[],createdAt:new Date().toISOString(),silentPast:Date.parse(step.id!)<=Date.now()}
+            if(step.editId){const index=data.reminders.findIndex(item=>item.id===step.editId);if(index<0)throw new Error('Напоминание уже удалено.');data.reminders[index]=reminder}
+            else data.reminders.push(reminder)
+            await save(data);pending=null;reply(step.editId?'Напоминание изменено, сэр. Новые текст и время сохранены.':'Напоминание сохранено, сэр.',step.editId?'':'reminder_saved');return
         }
         if(step.kind==='birthday-name'){pending={kind:'birthday-date',title:raw};reply('Назовите день и месяц цифрами: например, 12.04.','birthday_ask_date',true);return}
         if(step.kind==='birthday-date') {
@@ -167,11 +177,18 @@ export async function handleCenterVoice(raw: string) {
         if(/допол/.test(text)) {const data=await loadCenterData();if(!data.notes.length){reply('Заметок пока нет.','notes_empty');return}pending={kind:'append',ids:data.notes.map(item=>item.id)};reply('Какую заметку дополнить? '+data.notes.map((item,i)=>`${i+1}: ${item.title}`).join('; '),'note_ask_number',true)}
         else {pending={kind:/чек.?лист/.test(text)?'check-title':'note-title'};reply('Как назвать заметку, сэр?',/чек.?лист/.test(text)?'checklist_create':'note_create',true)}return
     }
-    if(/напоминан/.test(text)&&/добав|созда|новое/.test(text)){navigateCenter('reminders');pending={kind:'reminder-title'};reply('О чём напомнить, сэр?','reminder_ask_title',true);return}
+    if(/напоминан/.test(text)&&/измен|редакт|перенес/.test(text)) {
+        navigateCenter('reminders');const data=await loadCenterData(),items=[...data.reminders].sort((a,b)=>a.dueAt.localeCompare(b.dueAt))
+        if(!items.length){reply('У вас пока нет напоминаний, сэр.');return}
+        pending={kind:'reminder-select',ids:items.map(item=>item.id)};reply('Какое напоминание изменить? Назовите номер на экране.','',true)
+        if(spokenNumber(text))await handleCenterVoice(text)
+        return
+    }
+    if(/напоминан|напомни/.test(text)&&/добав|созда|новое|напомни/.test(text)){navigateCenter('reminders');pending={kind:'reminder-title'};reply('О чём напомнить, сэр?','reminder_ask_title',true);return}
     if(/рождения/.test(text)&&/добав|запи/.test(text)){navigateCenter('birthdays');pending={kind:'birthday-name'};reply('Назовите имя, сэр.','birthday_ask_name',true);return}
     if(/город/.test(text)&&/погод|прогноз|измени|установ/.test(text)){navigateCenter('weather');pending={kind:'city'};reply('Назовите город для прогноза, сэр.','weather_city',true);return}
     if(/вес|измерение/.test(text)&&/запи|добав|мой/.test(text)){navigateCenter('workouts');trainingVoiceTab.set('profile');pending={kind:'weight'};reply('Назовите вес в килограммах, сэр.','weight_add',true);return}
-    if(/расписание.*сегодня|планы.*сегодня/.test(text)){navigateCenter('calendar');const data=await loadCenterData(),today=dayKey(new Date());reply(data.reminders.filter(item=>!item.done&&item.dueAt.slice(0,10)===today).map(item=>item.title).join('; ')||'На сегодня нет активных напоминаний, сэр.','schedule_today');return}
+    if(/расписание.*сегодня|планы.*сегодня/.test(text)){navigateCenter('calendar');const data=await loadCenterData(),today=dayKey(new Date());reply(data.reminders.filter(item=>!item.done&&dayKey(new Date(item.dueAt))===today).map(item=>item.title).join('; ')||'На сегодня нет активных напоминаний, сэр.','schedule_today');return}
     if(/обнов/.test(text)&&/новост|лент/.test(text)){navigateCenter('news');const action=await waitForNewsAction();await action('refresh');reply('Новости обновлены, сэр.','news_refresh');return}
     if(/останов|выключ/.test(text)&&/озвуч/.test(text)){await invoke('chat_stop_speech');reply('Озвучка остановлена, сэр.','speech_stop');return}
     const pages:[RegExp,string,string][]=[[/новост|лент/,'news','news_open'],[/календар/,'calendar','calendar_open'],[/замет/,'notes','notes_open'],[/диктов|голос в текст/,'voice-text',''],[/напоминан/,'reminders',''],[/рождения/,'birthdays',''],[/погод|прогноз/,'weather','weather_week'],[/привыч/,'habits','habits_open'],[/зарядк/,'workouts','charge_open'],[/параметр/,'workouts','profile_open'],[/трениров/,'workouts','training_open'],[/статистик/,'workouts','stats_open'],[/хранилищ|парол/,'passwords','vault_open'],[/логи|истори/,'request-history',''],[/центр/,'calendar','center_open']]

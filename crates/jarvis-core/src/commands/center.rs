@@ -185,8 +185,18 @@ pub fn available_commands() -> Vec<JCommand> {
     "description": "Создать напоминание",
     "phrases": {
       "ru": [
-        "создай напоминание"
+        "создай напоминание",
+        "добавь напоминание",
+        "напомни мне"
       ]
+    }
+  },
+  {
+    "id": "center_reminder_edit",
+    "type": "center",
+    "description": "Изменить текст, время и предварительные предупреждения напоминания",
+    "phrases": {
+      "ru": ["измени напоминание", "редактируй напоминание", "измени первое напоминание", "перенеси напоминание"]
     }
   },
   {
@@ -334,6 +344,13 @@ pub fn available_commands() -> Vec<JCommand> {
       ]
     }
   }
+  , {"id":"outlook_open","type":"center","description":"Открыть почту Outlook","phrases":{"ru":["открой почту","открой outlook","покажи почту"]}}
+  , {"id":"outlook_refresh","type":"center","description":"Обновить последние 50 входящих","phrases":{"ru":["обнови почту","обнови письма","проверь почту"]}}
+  , {"id":"outlook_read","type":"center","description":"Открыть письмо по номеру","phrases":{"ru":["открой второе письмо","прочитай первое письмо"]}}
+  , {"id":"outlook_compose","type":"center","description":"Продиктовать получателя, тему и текст письма","phrases":{"ru":["напиши письмо","создай письмо","продолжить письмо"]}}
+  , {"id":"outlook_send","type":"center","description":"Проверить письмо и запросить подтверждение отправки","phrases":{"ru":["отправь письмо"]}}
+  , {"id":"outlook_draft","type":"center","description":"Сохранить письмо в черновиках Outlook","phrases":{"ru":["сохрани письмо в черновик","сохрани черновик"]}}
+  , {"id":"outlook_reply","type":"center","description":"Новое письмо отправителю выбранного письма","phrases":{"ru":["ответь на письмо"]}}
 ]"#).expect("valid built-in Center command catalog");
     for command in &mut commands {
         if let Some(phrases) = command.phrases.get_mut("ru") {

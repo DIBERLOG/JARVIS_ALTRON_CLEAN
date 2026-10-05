@@ -83,6 +83,7 @@ fn main() {
             tauri_commands::db_read,
             tauri_commands::db_write,
             tauri_commands::db_write_many,
+            tauri_commands::center_restore_data,
 
             // etc
             tauri_commands::get_app_version,
@@ -114,6 +115,7 @@ fn main() {
             tauri_commands::get_jarvis_terminal_log,
             tauri_commands::password_vault_load,
             tauri_commands::password_vault_save,
+            tauri_commands::outlook_request,
 
             // gliner
             tauri_commands::list_gliner_models,

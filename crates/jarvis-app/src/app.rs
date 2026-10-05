@@ -516,6 +516,14 @@ fn center_pending() -> bool {
     CENTER_PENDING.load(Ordering::SeqCst)
 }
 pub fn center_reply(text: String, reply_id: String, follow_up: bool) {
+    if reply_id == "reminder_notice" {
+        // Background reminders must not interrupt speech or alter a clarification dialogue.
+        while playback_active() || (CENTER_PENDING.load(Ordering::SeqCst) && center_time() < CENTER_DEADLINE.load(Ordering::SeqCst)) {
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+        tts::speak(&text);
+        return;
+    }
     let timer_warning = matches!(reply_id.as_str(), "timer_warning" | "timer_five_minutes" | "timer_one_minute" | "timer_finished");
     if timer_warning && (CENTER_PENDING.load(Ordering::SeqCst) || playback_active()) { return; }
     if !timer_warning { CENTER_DEADLINE.store(center_time()+90,Ordering::SeqCst);CENTER_PENDING.store(follow_up, Ordering::SeqCst); }
@@ -524,6 +532,9 @@ pub fn center_reply(text: String, reply_id: String, follow_up: bool) {
     if !timer_warning { CHAIN_LISTENING.store(follow_up, Ordering::SeqCst); }
 }
 fn center_phrase(text: &str) -> bool {
+    if text.starts_with("напомни") || (text.contains("напоминан") && ["измен", "редакт", "перенес"].iter().any(|word|text.contains(word))) { return true; }
+    if ["почт", "письм", "outlook", "аутлук"].iter().any(|word| text.contains(word))
+        && ["откр", "покаж", "обнов", "проверь", "прочит", "напиш", "напис", "созда", "состав", "подготов", "отправ", "ответ", "сохран", "продолж", "непрочитан"].iter().any(|word| text.contains(word)) { return true; }
     if jarvis_core::commands::center::matches_phrase(text) { return true; }
     let actionable=["откр","покаж","запуст","созда","добав","перев","отмет","сброс","приостан","пауз","продолж","возобнов","запи","допол","обнов","останов","выключ","начни","заверш","установ","измени"].iter().any(|word|text.contains(word));
     if !actionable && !["центр","календарь","заметки","привычки","таймер","мои параметры","расписание на сегодня"].contains(&text)

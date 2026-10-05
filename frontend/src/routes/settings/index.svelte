@@ -11,6 +11,7 @@
     import HDivider from "@/components/elements/HDivider.svelte"
     import Footer from "@/components/Footer.svelte"
     import ListeningShortcut from "@/components/ListeningShortcut.svelte"
+    import CenterDataTransfer from '@/components/CenterDataTransfer.svelte'
 
     import {
         Notification,
@@ -547,6 +548,7 @@
         </InputWrapper>
     </Tabs.Tab>
 </Tabs>
+<CenterDataTransfer />
 
 <Space h="xl" />
 
